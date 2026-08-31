@@ -1,6 +1,9 @@
+export type Claim = 'none' | 'broken'
+
 export interface DayResult {
   picked: readonly number[]
   exact: boolean
+  claim?: Claim
 }
 
 export interface SaveData {

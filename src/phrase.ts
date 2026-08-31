@@ -51,3 +51,8 @@ export function witnessExplanation(attrId: string, value: AttrValue): string {
 }
 
 export const INERT_EXPLANATION = 'Safe: nothing on the back can break the rule.'
+
+export const BROKEN_FACE_EXPLANATION =
+  'Breaks the rule face-up. No flip needed.'
+
+export const IRRELEVANT_EXPLANATION = 'Irrelevant: the rule was already broken.'

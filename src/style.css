@@ -140,7 +140,8 @@ h1 {
   height: 0.8125rem;
 }
 
-.card.wrong {
+.card.wrong,
+.card.broken {
   border: 2px solid var(--bad);
 }
 
@@ -190,6 +191,28 @@ h1 {
 
 .primary:active {
   transform: translateY(1px);
+}
+
+.secondary {
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--fg);
+  border-radius: 999px;
+  padding: 0.7rem 1.4rem;
+  min-height: 44px;
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.claims {
+  margin-top: 1rem;
+}
+
+.claims .actions {
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
 }
 
 .count {

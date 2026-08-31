@@ -1,7 +1,10 @@
 import {
+  generateBroken,
   generateConnective,
+  generateVacuous,
   type Difficulty,
   type GeneratedPuzzle,
+  type PuzzleKind,
 } from './engine/generate'
 import { hashSeed } from './seed'
 
@@ -45,6 +48,18 @@ export function difficultyFor(date: string): Difficulty {
   return WEEKDAY_DIFFICULTY[new Date(utc(date)).getUTCDay()]!
 }
 
+// Roughly one non-Monday in eight is a trap day.
+export function trapKind(date: string): PuzzleKind {
+  if (new Date(utc(date)).getUTCDay() === 1) return 'standard'
+  const h = hashSeed(`wason-trap-${date}`)
+  if (h % 8 !== 0) return 'standard'
+  return (h >> 3) % 2 === 0 ? 'vacuous' : 'broken'
+}
+
 export function dailyPuzzle(date: string): GeneratedPuzzle {
-  return generateConnective(hashSeed(`wason-${date}`), difficultyFor(date))
+  const kind = trapKind(date)
+  const seed = hashSeed(`wason-${date}`)
+  if (kind === 'vacuous') return generateVacuous(seed, difficultyFor(date))
+  if (kind === 'broken') return generateBroken(seed)
+  return generateConnective(seed, difficultyFor(date))
 }
