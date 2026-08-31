@@ -367,3 +367,65 @@ footer a {
 .controls .chip {
   padding-inline: 0.9rem;
 }
+
+.archive {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 1.5rem;
+}
+
+.archive a {
+  display: flex;
+  gap: 1rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--fg);
+  font-size: 0.9375rem;
+}
+
+.archive a:hover {
+  border-color: var(--fg);
+}
+
+.archive .num {
+  color: var(--muted);
+  min-width: 3rem;
+}
+
+.archive .st-exact,
+.archive .st-fail,
+.archive .st-open {
+  margin-left: auto;
+}
+
+.archive .st-fail {
+  color: var(--bad);
+}
+
+.archive .st-open {
+  color: var(--muted);
+}
+
+.primer {
+  margin: 1rem 0 0;
+  font-size: 0.9375rem;
+  border-left: 2px solid var(--accent, var(--fg));
+  padding-left: 0.75rem;
+}
+
+.primer a {
+  color: var(--fg);
+}
+
+.prose {
+  margin: 1rem 0 0;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.prose:first-of-type {
+  color: var(--fg);
+}

@@ -17,6 +17,7 @@ export interface SaveData {
   version: 1
   results: Record<string, DayResult>
   practice: Record<string, PracticeStats>
+  seenKinds: string[]
 }
 
 const KEY = 'wason'
@@ -31,13 +32,26 @@ export function loadState(storage: Pick<Storage, 'getItem'>): SaveData {
           version: 1,
           results: parsed.results,
           practice: parsed.practice ?? {},
+          seenKinds: parsed.seenKinds ?? [],
         }
       }
     }
   } catch {
     // fall through to a fresh state
   }
-  return { version: 1, results: {}, practice: {} }
+  return { version: 1, results: {}, practice: {}, seenKinds: [] }
+}
+
+export function markKindSeen(
+  storage: Pick<Storage, 'getItem' | 'setItem'>,
+  kind: string,
+): SaveData {
+  const state = loadState(storage)
+  if (!state.seenKinds.includes(kind)) {
+    state.seenKinds.push(kind)
+    storage.setItem(KEY, JSON.stringify(state))
+  }
+  return state
 }
 
 export function saveResult(
