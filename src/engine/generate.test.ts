@@ -3,7 +3,9 @@ import { hashSeed } from '../seed'
 import {
   FORMS,
   ITEM_COUNT,
+  generateBroken,
   generateConnective,
+  generateVacuous,
   type Difficulty,
 } from './generate'
 import { solve } from './solve'
@@ -65,4 +67,52 @@ describe('generateConnective', () => {
     },
     30000,
   )
+})
+
+describe('generateVacuous', () => {
+  it('produces puzzles where no flip is needed', () => {
+    for (let s = 0; s < 20; s++) {
+      const g = generateVacuous(hashSeed(`vac-${s}`), 3)
+      expect(g.meta.kind).toBe('vacuous')
+      expect(g.answer).toHaveLength(0)
+      const solution = solve(g.puzzle)
+      expect(solution.status).toBe('test')
+      expect(solution.reveals).toHaveLength(0)
+      expect(new Set(g.puzzle.items.map((it) => it.shown[0])).size).toBe(2)
+    }
+  })
+
+  it('is deterministic', () => {
+    const seed = hashSeed('vac-fixed')
+    expect(JSON.stringify(generateVacuous(seed, 4))).toBe(
+      JSON.stringify(generateVacuous(seed, 4)),
+    )
+  })
+})
+
+describe('generateBroken', () => {
+  it('produces puzzles already false from exactly one visible face', () => {
+    for (let s = 0; s < 20; s++) {
+      const g = generateBroken(hashSeed(`broke-${s}`))
+      expect(g.meta.kind).toBe('broken')
+      expect(g.answer).toHaveLength(0)
+      expect(g.meta.ruleHolds).toBe(false)
+      const solution = solve(g.puzzle)
+      expect(solution.status).toBe('already-false')
+      expect(
+        solution.perItem.filter((r) => r.kind === 'always-false'),
+      ).toHaveLength(1)
+      const hiders = g.puzzle.items.filter(
+        (it) => !it.shown.includes(g.meta.a.attr),
+      )
+      expect(hiders.length).toBeGreaterThanOrEqual(2)
+    }
+  })
+
+  it('is deterministic', () => {
+    const seed = hashSeed('broke-fixed')
+    expect(JSON.stringify(generateBroken(seed))).toBe(
+      JSON.stringify(generateBroken(seed)),
+    )
+  })
 })

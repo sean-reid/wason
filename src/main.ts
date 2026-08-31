@@ -2,12 +2,20 @@ import { dailyPuzzle, isValidDate, puzzleNumber, todayLocal } from './daily'
 import { solve } from './engine/solve'
 import type { Item } from './engine/types'
 import {
+  BROKEN_FACE_EXPLANATION,
   INERT_EXPLANATION,
+  IRRELEVANT_EXPLANATION,
   faceText,
   ruleSentence,
   witnessExplanation,
 } from './phrase'
-import { loadState, saveResult, streak, type DayResult } from './state'
+import {
+  loadState,
+  saveResult,
+  streak,
+  type Claim,
+  type DayResult,
+} from './state'
 
 const params = new URLSearchParams(location.search)
 const dateParam = params.get('date')
@@ -16,6 +24,18 @@ const gen = dailyPuzzle(date)
 const solution = solve(gen.puzzle)
 const required = new Set(gen.answer)
 const number = puzzleNumber(date)
+const broken = solution.status === 'already-false'
+const vacuous = !broken && required.size === 0
+
+function judgeExact(picked: readonly number[], claim?: Claim): boolean {
+  if (broken) return claim === 'broken'
+  if (vacuous) return claim === 'none'
+  return (
+    !claim &&
+    picked.length === required.size &&
+    picked.every((i) => required.has(i))
+  )
+}
 
 const selected = new Set<number>()
 const app = document.querySelector<HTMLDivElement>('#app')!
@@ -105,13 +125,35 @@ function render(): void {
   submit.type = 'button'
   submit.dataset.testid = 'submit'
   const count = el('span', 'count', '0 selected')
-  submit.addEventListener('click', () => {
-    const picked = [...selected].sort((a, b) => a - b)
-    const exact =
-      picked.length === required.size && picked.every((i) => required.has(i))
-    const result: DayResult = { picked, exact }
+  const finish = (picked: number[], claim?: Claim) => {
+    const result: DayResult = {
+      picked,
+      exact: judgeExact(picked, claim),
+      claim,
+    }
     saveResult(localStorage, date, result)
     renderDone(result)
+  }
+  submit.addEventListener('click', () => {
+    if (selected.size === 0) {
+      if (app.querySelector('.claims')) return
+      const claims = el('div', 'claims')
+      claims.append(el('p', 'hint', 'No flips is a claim. Which one?'))
+      const row = el('div', 'actions')
+      const none = el('button', 'secondary', 'Nothing could break it')
+      none.type = 'button'
+      none.dataset.testid = 'claim-none'
+      none.addEventListener('click', () => finish([], 'none'))
+      const flag = el('button', 'secondary', 'It is already broken')
+      flag.type = 'button'
+      flag.dataset.testid = 'claim-broken'
+      flag.addEventListener('click', () => finish([], 'broken'))
+      row.append(none, flag)
+      claims.append(row)
+      actions.after(claims)
+      return
+    }
+    finish([...selected].sort((a, b) => a - b))
   })
   actions.append(submit, count)
   app.append(actions)
@@ -137,8 +179,11 @@ function renderDone(result: DayResult): void {
     card.classList.add('revealed')
     card.setAttribute('aria-pressed', picked.has(i) ? 'true' : 'false')
     if (picked.has(i) !== required.has(i)) card.classList.add('wrong')
+    if (solution.perItem[i]!.kind === 'always-false')
+      card.classList.add('broken')
   })
   app.querySelector('.actions')?.remove()
+  app.querySelector('.claims')?.remove()
   app.querySelector('.verdict')?.remove()
   app.querySelector('.explain')?.remove()
   app.querySelector('.share')?.remove()
@@ -148,8 +193,30 @@ function renderDone(result: DayResult): void {
   const verdict = el('section', 'verdict')
   verdict.dataset.testid = 'verdict'
   if (result.exact) {
-    verdict.append(el('h2', undefined, 'Exact.'))
-    verdict.append(el('p', 'sub', 'You flipped only the cards that mattered.'))
+    if (broken) {
+      verdict.append(el('h2', undefined, 'Sharp eye.'))
+      verdict.append(el('p', 'sub', 'The rule was already false on the table.'))
+    } else if (vacuous) {
+      verdict.append(el('h2', undefined, 'Exact.'))
+      verdict.append(
+        el('p', 'sub', 'No card could have hidden a counterexample.'),
+      )
+    } else {
+      verdict.append(el('h2', undefined, 'Exact.'))
+      verdict.append(
+        el('p', 'sub', 'You flipped only the cards that mattered.'),
+      )
+    }
+  } else if (result.claim === 'broken') {
+    verdict.append(el('h2', undefined, 'Nothing was broken.'))
+    verdict.append(
+      el('p', 'sub', 'Every visible face is consistent with the rule.'),
+    )
+  } else if (broken) {
+    verdict.append(el('h2', undefined, 'It was already broken.'))
+    verdict.append(
+      el('p', 'sub', 'One visible face violated the rule before any flip.'),
+    )
   } else if (missed > 0) {
     verdict.append(el('h2', undefined, 'Not proven.'))
     verdict.append(
@@ -165,19 +232,23 @@ function renderDone(result: DayResult): void {
       el(
         'p',
         'sub',
-        `Every required card, plus ${extra} that could tell you nothing.`,
+        vacuous
+          ? `No flip was needed; ${extra} could tell you nothing.`
+          : `Every required card, plus ${extra} that could tell you nothing.`,
       ),
     )
   }
-  verdict.append(
-    el(
-      'p',
-      'sub',
-      gen.meta.ruleHolds
-        ? 'The hidden faces did obey the rule today.'
-        : 'And the backs show the rule was in fact false today.',
-    ),
-  )
+  if (!broken) {
+    verdict.append(
+      el(
+        'p',
+        'sub',
+        gen.meta.ruleHolds
+          ? 'The hidden faces did obey the rule today.'
+          : 'And the backs show the rule was in fact false today.',
+      ),
+    )
+  }
 
   const explain = el('ul', 'explain')
   gen.puzzle.items.forEach((item, i) => {
@@ -191,8 +262,11 @@ function renderDone(result: DayResult): void {
       shownAttr === 'color'
         ? String(item.attrs[shownAttr])
         : faceText(item.attrs[shownAttr]!)
-    const text =
-      report.kind === 'contingent'
+    const text = broken
+      ? report.kind === 'always-false'
+        ? BROKEN_FACE_EXPLANATION
+        : IRRELEVANT_EXPLANATION
+      : report.kind === 'contingent'
         ? witnessExplanation(
             hiddenAttrOf(item),
             report.witness![hiddenAttrOf(item)]!,

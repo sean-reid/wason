@@ -5,6 +5,7 @@ import {
   difficultyFor,
   isValidDate,
   puzzleNumber,
+  trapKind,
   todayLocal,
 } from './daily'
 
@@ -56,6 +57,38 @@ describe('dailyPuzzle', () => {
       const t = new Date(Date.UTC(2026, 7, 31 + offset))
       const date = t.toISOString().slice(0, 10)
       expect(() => dailyPuzzle(date)).not.toThrow()
+    }
+  })
+})
+
+describe('trapKind', () => {
+  it('is deterministic and never lands on a Monday', () => {
+    for (let offset = 0; offset < 400; offset++) {
+      const t = new Date(Date.UTC(2026, 7, 31 + offset))
+      const date = t.toISOString().slice(0, 10)
+      expect(trapKind(date)).toBe(trapKind(date))
+      if (t.getUTCDay() === 1) expect(trapKind(date)).toBe('standard')
+    }
+  })
+
+  it('lands traps of both kinds at a modest rate', () => {
+    const kinds = { standard: 0, vacuous: 0, broken: 0 }
+    for (let offset = 0; offset < 400; offset++) {
+      const t = new Date(Date.UTC(2026, 7, 31 + offset))
+      kinds[trapKind(t.toISOString().slice(0, 10))]++
+    }
+    const traps = kinds.vacuous + kinds.broken
+    expect(traps).toBeGreaterThan(10)
+    expect(traps).toBeLessThan(80)
+    expect(kinds.vacuous).toBeGreaterThan(0)
+    expect(kinds.broken).toBeGreaterThan(0)
+  })
+
+  it('drives dailyPuzzle to the matching generator', () => {
+    for (let offset = 0; offset < 120; offset++) {
+      const t = new Date(Date.UTC(2026, 7, 31 + offset))
+      const date = t.toISOString().slice(0, 10)
+      expect(dailyPuzzle(date).meta.kind).toBe(trapKind(date))
     }
   })
 })
