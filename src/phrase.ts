@@ -1,63 +1,48 @@
 import type { RelationalForm, RuleForm } from './engine/generate'
-import type { AttrValue } from './engine/types'
-
-const PRED_PHRASES: Record<string, string> = {
-  vowel: 'a vowel',
-  consonant: 'a consonant',
-  even: 'an even number',
-  odd: 'an odd number',
-  prime: 'a prime number',
-  red: 'a red side',
-  blue: 'a blue side',
-}
-
-export function predPhrase(predId: string): string {
-  const phrase = PRED_PHRASES[predId]
-  if (!phrase) throw new Error(`no phrase for predicate ${predId}`)
-  return phrase
-}
+import type { Attrs, AttrValue } from './engine/types'
+import { displayValue, type Skin } from './skins'
 
 export function ruleSentence(
+  skin: Skin,
   form: RuleForm | RelationalForm,
   aId: string,
   bId: string,
 ): string {
-  const a = predPhrase(aId)
-  const b = predPhrase(bId)
+  const vp = (id: string) => {
+    const voice = skin.preds[id]
+    if (!voice) throw new Error(`skin ${skin.id} cannot phrase ${id}`)
+    return voice.vp
+  }
+  const neg = (id: string) => skin.preds[id]!.neg
+  const { noun, pronoun } = skin
   switch (form) {
-    case 'right-of':
-      return `Every card with ${a} has a card with ${b} immediately to its right.`
-    case 'never-adjacent':
-      return aId === bId
-        ? `Two cards with ${a} are never side by side.`
-        : `A card with ${a} is never next to a card with ${b}.`
     case 'if-then':
-      return `If a card has ${a} on one side, it has ${b} on the other.`
+      return `If a ${noun} ${vp(aId)}, ${pronoun} ${vp(bId)}.`
     case 'only-if':
-      return `A card has ${a} on one side only if it has ${b} on the other.`
+      return `A ${noun} ${vp(aId)} only if ${pronoun} ${vp(bId)}.`
     case 'if-then-not':
-      return `If a card has ${a} on one side, it does not have ${b} on the other.`
+      return `If a ${noun} ${vp(aId)}, ${pronoun} ${neg(bId)}.`
     case 'if-not-then':
-      return `If a card does not have ${a} on one side, it has ${b} on the other.`
+      return `If a ${noun} ${neg(aId)}, ${pronoun} ${vp(bId)}.`
     case 'or':
-      return `Every card has ${a} or ${b}.`
+      return `Every ${noun} ${vp(aId)} or ${vp(bId)}.`
     case 'unless':
-      return `Every card has ${a} unless it has ${b}.`
+      return `Every ${noun} ${vp(aId)} unless ${pronoun} ${vp(bId)}.`
     case 'iff':
-      return `A card has ${a} if and only if it has ${b}.`
+      return `A ${noun} ${vp(aId)} if and only if ${pronoun} ${vp(bId)}.`
+    case 'right-of':
+      return `Every ${noun} that ${vp(aId)} is immediately followed by one that ${vp(bId)}.`
+    case 'never-adjacent':
+      return `A ${noun} that ${vp(aId)} is never next to another that ${vp(bId)}.`
   }
 }
 
-export function faceText(value: AttrValue): string {
-  return String(value)
-}
-
-export function witnessExplanation(attrId: string, value: AttrValue): string {
-  const face =
-    attrId === 'color'
-      ? `a ${String(value)} back`
-      : `${String(value)} on the back`
-  return `Required: ${face} would break the rule.`
+export function witnessExplanation(
+  skin: Skin,
+  attrId: string,
+  value: AttrValue,
+): string {
+  return `Required: ${displayValue(skin, attrId, value)} on the back would break the rule.`
 }
 
 export const INERT_EXPLANATION = 'Safe: nothing on the back can break the rule.'
@@ -68,32 +53,31 @@ export const BROKEN_FACE_EXPLANATION =
 export const IRRELEVANT_EXPLANATION = 'Irrelevant: the rule was already broken.'
 
 export function multiWitnessExplanation(
+  skin: Skin,
   attrIds: readonly string[],
-  witness: Readonly<Record<string, AttrValue>>,
+  witness: Attrs,
 ): string {
-  const v = (id: string) => String(witness[id])
+  const label = (id: string) => skin.attrLabels[id] ?? id
+  const val = (id: string) => displayValue(skin, id, witness[id]!)
   if (attrIds.length === 1) {
     const id = attrIds[0]!
-    return `Required: the ${id} face (${v(id)} there would break the rule).`
+    return `Required: the ${label(id)} face (${val(id)} there would break the rule).`
   }
   const [x, y] = attrIds as [string, string]
-  return `Required: both the ${x} and ${y} faces (${v(x)} with ${v(y)} would break the rule).`
+  return `Required: both the ${label(x)} and ${label(y)} faces (${val(x)} with ${val(y)} would break the rule).`
 }
 
 export function auditWitnessExplanation(
+  skin: Skin,
   attrId: string,
   value: AttrValue,
   ruleNums: readonly number[],
 ): string {
-  const face =
-    attrId === 'color'
-      ? `a ${String(value)} back`
-      : `${String(value)} on the back`
   const which =
     ruleNums.length > 1
       ? `rules ${ruleNums.join(' and ')}`
       : `rule ${ruleNums[0]}`
-  return `Required: ${face} would break ${which}.`
+  return `Required: ${displayValue(skin, attrId, value)} on the back would break ${which}.`
 }
 
 export const RELATIONAL_REQUIRED =

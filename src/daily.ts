@@ -48,8 +48,12 @@ const WEEKDAY_DIFFICULTY: Record<number, Difficulty> = {
   0: 5,
 }
 
+export function weekdayOf(date: string): number {
+  return new Date(utc(date)).getUTCDay()
+}
+
 export function difficultyFor(date: string): Difficulty {
-  return WEEKDAY_DIFFICULTY[new Date(utc(date)).getUTCDay()]!
+  return WEEKDAY_DIFFICULTY[weekdayOf(date)]!
 }
 
 // Roughly one non-Monday in eight is a trap day; other Saturdays are
