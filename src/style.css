@@ -320,3 +320,18 @@ footer a {
 .rulewrap .rule + .rule {
   margin-top: 0.5rem;
 }
+
+.val.word {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.card[aria-pressed='true'] {
+  border-color: var(--accent, var(--fg));
+}
+
+.chip[aria-pressed='true'] {
+  border-color: var(--accent, var(--fg));
+  color: var(--accent, var(--fg));
+}

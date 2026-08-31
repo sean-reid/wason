@@ -11,11 +11,11 @@ import {
   RELATIONAL_REQUIRED,
   RELATIONAL_SAFE,
   auditWitnessExplanation,
-  faceText,
   multiWitnessExplanation,
   ruleSentence,
   witnessExplanation,
 } from './phrase'
+import { displayValue, skinFor } from './skins'
 import {
   loadState,
   saveResult,
@@ -28,6 +28,7 @@ const params = new URLSearchParams(location.search)
 const dateParam = params.get('date')
 const date = dateParam && isValidDate(dateParam) ? dateParam : todayLocal()
 const gen = dailyPuzzle(date)
+const skin = skinFor(date, gen)
 const solution = solve(gen.puzzle)
 const facesMode = gen.meta.kind === 'multi'
 const relationalMode = gen.meta.kind === 'relational'
@@ -55,6 +56,9 @@ function judgeExact(picked: readonly string[], claim?: Claim): boolean {
   )
 }
 
+if (skin.accent)
+  document.documentElement.style.setProperty('--accent', skin.accent)
+
 const selected = new Set<string>()
 const app = document.querySelector<HTMLDivElement>('#app')!
 
@@ -74,12 +78,13 @@ function hiddenAttrsOf(item: Item): string[] {
 }
 
 function faceContent(attrId: string, value: string | number): HTMLElement {
-  if (attrId === 'color') {
+  if (skin.swatchAttrs.includes(attrId)) {
     const dot = el('span', `swatch c-${String(value)}`)
     dot.title = String(value)
     return dot
   }
-  return el('span', 'val', faceText(value))
+  const text = displayValue(skin, attrId, value)
+  return el('span', text.length > 3 ? 'val word' : 'val', text)
 }
 
 function render(): void {
@@ -102,7 +107,11 @@ function render(): void {
     wrap.dataset.testid = 'rule'
     gen.meta.rules!.forEach((r, idx) => {
       wrap.append(
-        el('p', 'rule', `${idx + 1}. ${ruleSentence(r.form, r.a.id, r.b.id)}`),
+        el(
+          'p',
+          'rule',
+          `${idx + 1}. ${ruleSentence(skin, r.form, r.a.id, r.b.id)}`,
+        ),
       )
     })
     app.append(wrap)
@@ -110,7 +119,7 @@ function render(): void {
     const rule = el(
       'p',
       'rule',
-      ruleSentence(gen.meta.form, gen.meta.a.id, gen.meta.b.id),
+      ruleSentence(skin, gen.meta.form, gen.meta.a.id, gen.meta.b.id),
     )
     rule.dataset.testid = 'rule'
     app.append(rule)
@@ -161,7 +170,7 @@ function render(): void {
     const stack = el('div', 'stack')
     const chips = el('div', 'chips')
     for (const id of hidden) {
-      const chip = el('button', 'chip', id)
+      const chip = el('button', 'chip', skin.attrLabels[id] ?? id)
       chip.type = 'button'
       const key = `${i}:${id}`
       chip.dataset.key = key
@@ -334,10 +343,7 @@ function renderDone(result: DayResult): void {
     const itemRight = keys.every((k) => picked.has(k) === required.has(k))
     const line = el('li', itemRight ? 'right' : 'missed')
     const shownAttr = item.shown[0]!
-    const face =
-      shownAttr === 'color'
-        ? String(item.attrs[shownAttr])
-        : faceText(item.attrs[shownAttr]!)
+    const face = displayValue(skin, shownAttr, item.attrs[shownAttr]!)
     let text: string
     if (broken) {
       text =
@@ -353,6 +359,7 @@ function renderDone(result: DayResult): void {
       text = INERT_EXPLANATION
     } else if (facesMode) {
       text = multiWitnessExplanation(
+        skin,
         report.minimalReveals![0]!,
         report.witness!,
       )
@@ -363,10 +370,15 @@ function renderDone(result: DayResult): void {
         evalProp(p, report.witness!) ? [] : [idx + 1],
       )
       const hidden = hiddenAttrsOf(item)[0]!
-      text = auditWitnessExplanation(hidden, report.witness![hidden]!, nums)
+      text = auditWitnessExplanation(
+        skin,
+        hidden,
+        report.witness![hidden]!,
+        nums,
+      )
     } else {
       const hidden = hiddenAttrsOf(item)[0]!
-      text = witnessExplanation(hidden, report.witness![hidden]!)
+      text = witnessExplanation(skin, hidden, report.witness![hidden]!)
     }
     line.textContent = `${face} · ${text}`
     explain.append(line)
