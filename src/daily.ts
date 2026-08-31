@@ -37,6 +37,12 @@ export function puzzleNumber(date: string): number {
   return Math.round((utc(date) - utc(DAY_ONE)) / MS_PER_DAY) + 1
 }
 
+export function dateOfNumber(n: number): string {
+  return new Date(utc(DAY_ONE) + (n - 1) * MS_PER_DAY)
+    .toISOString()
+    .slice(0, 10)
+}
+
 // Monday through Sunday ramp.
 const WEEKDAY_DIFFICULTY: Record<number, Difficulty> = {
   1: 1,

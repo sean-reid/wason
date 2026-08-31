@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   loadState,
+  markKindSeen,
   practiceStats,
   recordPractice,
   saveResult,
@@ -22,6 +23,7 @@ describe('loadState', () => {
       version: 1,
       results: {},
       practice: {},
+      seenKinds: [],
     })
   })
 
@@ -30,11 +32,13 @@ describe('loadState', () => {
       version: 1,
       results: {},
       practice: {},
+      seenKinds: [],
     })
     expect(loadState(fakeStorage('{"version":9}'))).toEqual({
       version: 1,
       results: {},
       practice: {},
+      seenKinds: [],
     })
   })
 
@@ -101,5 +105,15 @@ describe('practice stats', () => {
       played: 0,
       exact: 0,
     })
+  })
+})
+
+describe('markKindSeen', () => {
+  it('records each kind once', () => {
+    const storage = fakeStorage()
+    markKindSeen(storage, 'multi')
+    markKindSeen(storage, 'multi')
+    markKindSeen(storage, 'audit')
+    expect(loadState(storage).seenKinds).toEqual(['multi', 'audit'])
   })
 })

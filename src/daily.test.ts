@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DAY_ONE,
   dailyPuzzle,
+  dateOfNumber,
   difficultyFor,
   isValidDate,
   puzzleNumber,
@@ -160,5 +161,18 @@ describe('identification wednesdays', () => {
       if (kind === 'ident') count++
     }
     expect(count).toBeGreaterThan(40)
+  })
+})
+
+describe('dateOfNumber', () => {
+  it('inverts puzzleNumber', () => {
+    for (const date of [
+      '2026-08-31',
+      '2026-09-15',
+      '2026-12-31',
+      '2027-03-01',
+    ]) {
+      expect(dateOfNumber(puzzleNumber(date))).toBe(date)
+    }
   })
 })
