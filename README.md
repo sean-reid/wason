@@ -1,6 +1,6 @@
 # Wason
 
-A daily logic puzzle about falsification, based on the [Wason selection task](https://en.wikipedia.org/wiki/Wason_selection_task). Each day everyone gets the same puzzle, generated in the browser from the date. No server, no answer key: the puzzle is derived, not stored.
+A daily logic puzzle based on the [Wason selection task](https://en.wikipedia.org/wiki/Wason_selection_task). Each day everyone gets the same puzzle, generated in the browser from the date. No server, no answer key: the puzzle is derived, not stored.
 
 Play at https://sean-reid.github.io/wason/
 
