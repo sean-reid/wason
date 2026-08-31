@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest'
+import { evalProp } from './rule'
+import type { ItemProp } from './types'
 import { hashSeed } from '../seed'
 import {
   FORMS,
   ITEM_COUNT,
   generateBroken,
+  generateAudit,
   generateConnective,
   generateMultiAttr,
   generateVacuous,
   type Difficulty,
 } from './generate'
-import { solve } from './solve'
+import { completions, solve } from './solve'
 
 const DIFFICULTIES: readonly Difficulty[] = [1, 2, 3, 4, 5]
 
@@ -140,6 +143,38 @@ describe('generateMultiAttr', () => {
     const seed = hashSeed('multi-fixed')
     expect(JSON.stringify(generateMultiAttr(seed))).toBe(
       JSON.stringify(generateMultiAttr(seed)),
+    )
+  })
+})
+
+describe('generateAudit', () => {
+  it('produces two distinct rules with overlap and exclusive threats', () => {
+    for (let s = 0; s < 15; s++) {
+      const g = generateAudit(hashSeed(`audit-${s}`))
+      expect(g.meta.kind).toBe('audit')
+      expect(g.meta.rules).toHaveLength(2)
+      const [p1, p2] = (g.puzzle.rule.prop as { kind: 'and'; of: ItemProp[] })
+        .of
+      expect(JSON.stringify(p1)).not.toBe(JSON.stringify(p2))
+      const solution = solve(g.puzzle)
+      expect(solution.status).toBe('test')
+      expect(solution.unique).toBe(true)
+      expect(g.answer.length).toBeGreaterThanOrEqual(3)
+      expect(g.answer.length).toBeLessThan(g.puzzle.items.length)
+      const breakSets = g.answer.map((i) => {
+        const comps = completions(g.puzzle.items[i]!, g.puzzle.attributes)
+        return [p1!, p2!].map((p) => comps.some((c) => !evalProp(p, c)))
+      })
+      expect(breakSets.some(([a, b]) => a && b)).toBe(true)
+      expect(breakSets.some(([a, b]) => a && !b)).toBe(true)
+      expect(breakSets.some(([a, b]) => !a && b)).toBe(true)
+    }
+  })
+
+  it('is deterministic', () => {
+    const seed = hashSeed('audit-fixed')
+    expect(JSON.stringify(generateAudit(seed))).toBe(
+      JSON.stringify(generateAudit(seed)),
     )
   })
 })

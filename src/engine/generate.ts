@@ -1,6 +1,6 @@
 import { mulberry32 } from '../seed'
-import { evalRule } from './rule'
-import { solve } from './solve'
+import { evalProp, evalRule } from './rule'
+import { completions, solve } from './solve'
 import type { AttributeDef, Item, ItemProp, Pred, Puzzle } from './types'
 
 export type RuleForm =
@@ -24,10 +24,11 @@ export interface GeneratedPuzzle {
     a: Pred
     b: Pred
     ruleHolds: boolean
+    rules?: readonly RuleSpec[]
   }
 }
 
-export type PuzzleKind = 'standard' | 'vacuous' | 'broken' | 'multi'
+export type PuzzleKind = 'standard' | 'vacuous' | 'broken' | 'multi' | 'audit'
 
 export const ATTRIBUTES: readonly AttributeDef[] = [
   { id: 'letter', domain: ['A', 'E', 'I', 'U', 'B', 'K', 'R', 'T'] },
@@ -394,6 +395,110 @@ function tryGenerateMultiAttr(rng: () => number): GeneratedPuzzle | undefined {
       form,
       a,
       b,
+      ruleHolds: evalRule(
+        puzzle.rule,
+        items.map((it) => it.attrs),
+      ),
+    },
+  }
+}
+
+export interface RuleSpec {
+  form: RuleForm
+  a: Pred
+  b: Pred
+}
+
+const AUDIT_FORMS: readonly RuleForm[] = [
+  'if-then',
+  'if-then-not',
+  'only-if',
+  'or',
+  'unless',
+]
+
+// An audit day: two rules over the same attribute pair are in force at once.
+// One flip can test both rules, so the minimal set rewards spotting overlap.
+export function generateAudit(seed: number): GeneratedPuzzle {
+  const rng = mulberry32(seed)
+  for (let attempt = 0; attempt < 5000; attempt++) {
+    const candidate = tryGenerateAudit(rng)
+    if (candidate) return candidate
+  }
+  throw new Error(`no audit puzzle for seed ${seed}`)
+}
+
+function tryGenerateAudit(rng: () => number): GeneratedPuzzle | undefined {
+  const attrX = pick(rng, ATTRIBUTES)
+  const attrY = pick(
+    rng,
+    ATTRIBUTES.filter((z) => z.id !== attrX.id),
+  )
+  const xPreds = PREDS.filter((p) => p.attr === attrX.id)
+  const yPreds = PREDS.filter((p) => p.attr === attrY.id)
+  const r1: RuleSpec = {
+    form: pick(rng, AUDIT_FORMS),
+    a: pick(rng, xPreds),
+    b: pick(rng, yPreds),
+  }
+  const r2: RuleSpec = {
+    form: pick(rng, AUDIT_FORMS),
+    a: pick(rng, xPreds),
+    b: pick(rng, yPreds),
+  }
+  const p1 = buildProp(r1.form, r1.a, r1.b)
+  const p2 = buildProp(r2.form, r2.a, r2.b)
+  if (JSON.stringify(p1) === JSON.stringify(p2)) return undefined
+
+  const attributes = [attrX, attrY]
+  const n = 6
+  const items: Item[] = []
+  const usedFaces = new Set<string>()
+  for (let i = 0; i < n; i++) {
+    const shownAttr = i < 2 ? attributes[i % 2]! : pick(rng, attributes)
+    const hiddenAttr = attributes.find((x) => x.id !== shownAttr.id)!
+    const shownValue = pick(rng, shownAttr.domain)
+    const face = `${shownAttr.id} ${String(shownValue)}`
+    if (usedFaces.has(face)) return undefined
+    usedFaces.add(face)
+    items.push({
+      attrs: {
+        [shownAttr.id]: shownValue,
+        [hiddenAttr.id]: pick(rng, hiddenAttr.domain),
+      },
+      shown: [shownAttr.id],
+    })
+  }
+
+  const puzzle: Puzzle = {
+    attributes,
+    items,
+    rule: { kind: 'every-item', prop: { kind: 'and', of: [p1, p2] } },
+  }
+  const solution = solve(puzzle)
+  if (solution.status !== 'test' || !solution.unique) return undefined
+
+  const answer = solution.reveals.map((r) => r.item)
+  if (answer.length < 3 || answer.length >= n) return undefined
+
+  const breakSets = answer.map((i) => {
+    const comps = completions(items[i]!, attributes)
+    return [p1, p2].map((p) => comps.some((c) => !evalProp(p, c)))
+  })
+  if (!breakSets.some(([one, two]) => one && two)) return undefined
+  if (!breakSets.some(([one, two]) => one && !two)) return undefined
+  if (!breakSets.some(([one, two]) => !one && two)) return undefined
+
+  return {
+    puzzle,
+    answer,
+    meta: {
+      kind: 'audit',
+      difficulty: 5,
+      form: r1.form,
+      a: r1.a,
+      b: r1.b,
+      rules: [r1, r2],
       ruleHolds: evalRule(
         puzzle.rule,
         items.map((it) => it.attrs),
