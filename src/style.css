@@ -263,3 +263,48 @@ footer {
 footer a {
   color: var(--muted);
 }
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.chips {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.chip {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.55rem 0.5rem;
+  min-height: 44px;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip[aria-pressed='true'] {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+
+.chip.wrong {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+.chip:disabled {
+  cursor: default;
+}
+
+.card.revealed .back.multi {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 1.25rem;
+}

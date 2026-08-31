@@ -25,17 +25,17 @@ describe('loadState', () => {
 
   it('round-trips a saved result', () => {
     const storage = fakeStorage()
-    saveResult(storage, '2026-09-07', { picked: [0, 3], exact: true })
+    saveResult(storage, '2026-09-07', { picked: ['0', '3'], exact: true })
     expect(loadState(storage).results['2026-09-07']).toEqual({
-      picked: [0, 3],
+      picked: ['0', '3'],
       exact: true,
     })
   })
 })
 
 describe('streak', () => {
-  const exact = { picked: [0], exact: true }
-  const failed = { picked: [0], exact: false }
+  const exact = { picked: ['0'], exact: true }
+  const failed = { picked: ['0'], exact: false }
 
   it('counts consecutive exact days ending at the given date', () => {
     const results = {

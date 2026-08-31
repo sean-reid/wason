@@ -6,6 +6,7 @@ import {
   INERT_EXPLANATION,
   IRRELEVANT_EXPLANATION,
   faceText,
+  multiWitnessExplanation,
   ruleSentence,
   witnessExplanation,
 } from './phrase'
@@ -22,22 +23,28 @@ const dateParam = params.get('date')
 const date = dateParam && isValidDate(dateParam) ? dateParam : todayLocal()
 const gen = dailyPuzzle(date)
 const solution = solve(gen.puzzle)
-const required = new Set(gen.answer)
+const facesMode = gen.meta.kind === 'multi'
+const required = new Set<string>(
+  facesMode
+    ? solution.reveals.flatMap((r) => r.attrs.map((a) => `${r.item}:${a}`))
+    : solution.reveals.map((r) => String(r.item)),
+)
 const number = puzzleNumber(date)
 const broken = solution.status === 'already-false'
 const vacuous = !broken && required.size === 0
+const unit = facesMode ? 'face' : 'card'
 
-function judgeExact(picked: readonly number[], claim?: Claim): boolean {
+function judgeExact(picked: readonly string[], claim?: Claim): boolean {
   if (broken) return claim === 'broken'
   if (vacuous) return claim === 'none'
   return (
     !claim &&
     picked.length === required.size &&
-    picked.every((i) => required.has(i))
+    picked.every((k) => required.has(k))
   )
 }
 
-const selected = new Set<number>()
+const selected = new Set<string>()
 const app = document.querySelector<HTMLDivElement>('#app')!
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -51,23 +58,17 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node
 }
 
-function hiddenAttrOf(item: Item): string {
-  return Object.keys(item.attrs).find((id) => !item.shown.includes(id))!
+function hiddenAttrsOf(item: Item): string[] {
+  return Object.keys(item.attrs).filter((id) => !item.shown.includes(id))
 }
 
-function facePiece(
-  attrId: string,
-  value: string | number,
-  cls: string,
-): HTMLElement {
+function faceContent(attrId: string, value: string | number): HTMLElement {
   if (attrId === 'color') {
-    const wrap = el('span', `face ${cls}`)
     const dot = el('span', `swatch c-${String(value)}`)
     dot.title = String(value)
-    wrap.append(dot)
-    return wrap
+    return dot
   }
-  return el('span', `face ${cls}`, faceText(value))
+  return el('span', 'val', faceText(value))
 }
 
 function render(): void {
@@ -96,27 +97,57 @@ function render(): void {
     el(
       'p',
       'hint',
-      'Flip exactly the cards that could prove this false. No more, no fewer.',
+      facesMode
+        ? 'Each card hides two faces. Flip exactly the faces that could prove this false.'
+        : 'Flip exactly the cards that could prove this false. No more, no fewer.',
     ),
   )
 
   const grid = el('div', 'cards')
   gen.puzzle.items.forEach((item, i) => {
-    const card = el('button', 'card')
-    card.type = 'button'
+    const card = el(facesMode ? 'div' : 'button', 'card')
+    if (card instanceof HTMLButtonElement) card.type = 'button'
     card.dataset.index = String(i)
-    card.setAttribute('aria-pressed', 'false')
     const shownAttr = item.shown[0]!
-    card.append(facePiece(shownAttr, item.attrs[shownAttr]!, 'front'))
-    const hidden = hiddenAttrOf(item)
-    card.append(facePiece(hidden, item.attrs[hidden]!, 'back'))
-    card.addEventListener('click', () => {
-      if (selected.has(i)) selected.delete(i)
-      else selected.add(i)
-      card.setAttribute('aria-pressed', selected.has(i) ? 'true' : 'false')
-      count.textContent = `${selected.size} selected`
-    })
-    grid.append(card)
+    const front = el('span', 'face front')
+    front.append(faceContent(shownAttr, item.attrs[shownAttr]!))
+    card.append(front)
+    const hidden = hiddenAttrsOf(item)
+    const back = el('span', hidden.length > 1 ? 'face back multi' : 'face back')
+    for (const id of hidden) back.append(faceContent(id, item.attrs[id]!))
+    card.append(back)
+
+    if (!facesMode) {
+      card.setAttribute('aria-pressed', 'false')
+      card.addEventListener('click', () => {
+        const key = String(i)
+        if (selected.has(key)) selected.delete(key)
+        else selected.add(key)
+        card.setAttribute('aria-pressed', selected.has(key) ? 'true' : 'false')
+        count.textContent = `${selected.size} selected`
+      })
+      grid.append(card)
+      return
+    }
+
+    const stack = el('div', 'stack')
+    const chips = el('div', 'chips')
+    for (const id of hidden) {
+      const chip = el('button', 'chip', id)
+      chip.type = 'button'
+      const key = `${i}:${id}`
+      chip.dataset.key = key
+      chip.setAttribute('aria-pressed', 'false')
+      chip.addEventListener('click', () => {
+        if (selected.has(key)) selected.delete(key)
+        else selected.add(key)
+        chip.setAttribute('aria-pressed', selected.has(key) ? 'true' : 'false')
+        count.textContent = `${selected.size} selected`
+      })
+      chips.append(chip)
+    }
+    stack.append(card, chips)
+    grid.append(stack)
   })
   app.append(grid)
 
@@ -125,7 +156,7 @@ function render(): void {
   submit.type = 'button'
   submit.dataset.testid = 'submit'
   const count = el('span', 'count', '0 selected')
-  const finish = (picked: number[], claim?: Claim) => {
+  const finish = (picked: string[], claim?: Claim) => {
     const result: DayResult = {
       picked,
       exact: judgeExact(picked, claim),
@@ -153,7 +184,7 @@ function render(): void {
       actions.after(claims)
       return
     }
-    finish([...selected].sort((a, b) => a - b))
+    finish([...selected].sort())
   })
   actions.append(submit, count)
   app.append(actions)
@@ -168,19 +199,32 @@ function render(): void {
   if (prior) renderDone(prior)
 }
 
+function itemKeys(i: number): string[] {
+  if (!facesMode) return [String(i)]
+  return hiddenAttrsOf(gen.puzzle.items[i]!).map((id) => `${i}:${id}`)
+}
+
 function renderDone(result: DayResult): void {
   const meta = app.querySelector('.meta')
   if (meta)
     meta.textContent = `#${number} · streak ${streak(loadState(localStorage).results, date)}`
-  const picked = new Set(result.picked)
-  const cards = app.querySelectorAll<HTMLButtonElement>('.card')
+  const picked = new Set(result.picked.map(String))
+  const cards = app.querySelectorAll<HTMLElement>('.card')
   cards.forEach((card, i) => {
-    card.disabled = true
+    if (card instanceof HTMLButtonElement) card.disabled = true
     card.classList.add('revealed')
-    card.setAttribute('aria-pressed', picked.has(i) ? 'true' : 'false')
-    if (picked.has(i) !== required.has(i)) card.classList.add('wrong')
+    if (!facesMode) {
+      const key = String(i)
+      card.setAttribute('aria-pressed', picked.has(key) ? 'true' : 'false')
+      if (picked.has(key) !== required.has(key)) card.classList.add('wrong')
+    }
     if (solution.perItem[i]!.kind === 'always-false')
       card.classList.add('broken')
+  })
+  app.querySelectorAll<HTMLButtonElement>('.chip').forEach((chip) => {
+    chip.disabled = true
+    const key = chip.dataset.key!
+    if (picked.has(key) !== required.has(key)) chip.classList.add('wrong')
   })
   app.querySelector('.actions')?.remove()
   app.querySelector('.claims')?.remove()
@@ -188,8 +232,8 @@ function renderDone(result: DayResult): void {
   app.querySelector('.explain')?.remove()
   app.querySelector('.share')?.remove()
 
-  const missed = [...required].filter((i) => !picked.has(i)).length
-  const extra = [...picked].filter((i) => !required.has(i)).length
+  const missed = [...required].filter((k) => !picked.has(k)).length
+  const extra = [...picked].filter((k) => !required.has(k)).length
   const verdict = el('section', 'verdict')
   verdict.dataset.testid = 'verdict'
   if (result.exact) {
@@ -204,7 +248,7 @@ function renderDone(result: DayResult): void {
     } else {
       verdict.append(el('h2', undefined, 'Exact.'))
       verdict.append(
-        el('p', 'sub', 'You flipped only the cards that mattered.'),
+        el('p', 'sub', `You flipped only the ${unit}s that mattered.`),
       )
     }
   } else if (result.claim === 'broken') {
@@ -223,7 +267,7 @@ function renderDone(result: DayResult): void {
       el(
         'p',
         'sub',
-        `You missed ${missed} required card${missed === 1 ? '' : 's'}.`,
+        `You missed ${missed} required ${unit}${missed === 1 ? '' : 's'}.`,
       ),
     )
   } else {
@@ -234,7 +278,7 @@ function renderDone(result: DayResult): void {
         'sub',
         vacuous
           ? `No flip was needed; ${extra} could tell you nothing.`
-          : `Every required card, plus ${extra} that could tell you nothing.`,
+          : `Every required ${unit}, plus ${extra} that could tell you nothing.`,
       ),
     )
   }
@@ -253,25 +297,31 @@ function renderDone(result: DayResult): void {
   const explain = el('ul', 'explain')
   gen.puzzle.items.forEach((item, i) => {
     const report = solution.perItem[i]!
-    const line = el(
-      'li',
-      picked.has(i) === required.has(i) ? 'right' : 'missed',
-    )
+    const keys = itemKeys(i)
+    const itemRight = keys.every((k) => picked.has(k) === required.has(k))
+    const line = el('li', itemRight ? 'right' : 'missed')
     const shownAttr = item.shown[0]!
     const face =
       shownAttr === 'color'
         ? String(item.attrs[shownAttr])
         : faceText(item.attrs[shownAttr]!)
-    const text = broken
-      ? report.kind === 'always-false'
-        ? BROKEN_FACE_EXPLANATION
-        : IRRELEVANT_EXPLANATION
-      : report.kind === 'contingent'
-        ? witnessExplanation(
-            hiddenAttrOf(item),
-            report.witness![hiddenAttrOf(item)]!,
-          )
-        : INERT_EXPLANATION
+    let text: string
+    if (broken) {
+      text =
+        report.kind === 'always-false'
+          ? BROKEN_FACE_EXPLANATION
+          : IRRELEVANT_EXPLANATION
+    } else if (report.kind !== 'contingent') {
+      text = INERT_EXPLANATION
+    } else if (facesMode) {
+      text = multiWitnessExplanation(
+        report.minimalReveals![0]!,
+        report.witness!,
+      )
+    } else {
+      const hidden = hiddenAttrsOf(item)[0]!
+      text = witnessExplanation(hidden, report.witness![hidden]!)
+    }
     line.textContent = `${face} · ${text}`
     explain.append(line)
   })
