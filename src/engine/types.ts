@@ -19,10 +19,14 @@ export type ItemProp =
   | { kind: 'implies'; ante: ItemProp; cons: ItemProp }
   | { kind: 'iff'; a: ItemProp; b: ItemProp }
 
-export interface Rule {
-  kind: 'every-item'
-  prop: ItemProp
-}
+export type Rule =
+  | { kind: 'every-item'; prop: ItemProp }
+  | {
+      kind: 'adjacent'
+      variant: 'right-of' | 'never-adjacent'
+      a: Pred
+      b: Pred
+    }
 
 export type Attrs = Readonly<Record<string, AttrValue>>
 

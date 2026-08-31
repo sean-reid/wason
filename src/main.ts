@@ -6,6 +6,8 @@ import {
   BROKEN_FACE_EXPLANATION,
   INERT_EXPLANATION,
   IRRELEVANT_EXPLANATION,
+  RELATIONAL_REQUIRED,
+  RELATIONAL_SAFE,
   auditWitnessExplanation,
   faceText,
   multiWitnessExplanation,
@@ -26,6 +28,7 @@ const date = dateParam && isValidDate(dateParam) ? dateParam : todayLocal()
 const gen = dailyPuzzle(date)
 const solution = solve(gen.puzzle)
 const facesMode = gen.meta.kind === 'multi'
+const relationalMode = gen.meta.kind === 'relational'
 const auditMode = gen.meta.kind === 'audit'
 const required = new Set<string>(
   facesMode
@@ -115,7 +118,9 @@ function render(): void {
         ? 'Each card hides two faces. Flip exactly the faces that could prove this false.'
         : auditMode
           ? 'Both rules are in force. Flip exactly the cards that could prove either one false.'
-          : 'Flip exactly the cards that could prove this false. No more, no fewer.',
+          : relationalMode
+            ? 'Order matters: the rule constrains neighbors. Flip exactly the cards that could prove it false.'
+            : 'Flip exactly the cards that could prove this false. No more, no fewer.',
     ),
   )
 
@@ -327,6 +332,9 @@ function renderDone(result: DayResult): void {
         report.kind === 'always-false'
           ? BROKEN_FACE_EXPLANATION
           : IRRELEVANT_EXPLANATION
+    } else if (relationalMode) {
+      text =
+        report.kind === 'contingent' ? RELATIONAL_REQUIRED : RELATIONAL_SAFE
     } else if (report.kind !== 'contingent') {
       text = INERT_EXPLANATION
     } else if (facesMode) {
@@ -334,7 +342,7 @@ function renderDone(result: DayResult): void {
         report.minimalReveals![0]!,
         report.witness!,
       )
-    } else if (auditMode) {
+    } else if (auditMode && gen.puzzle.rule.kind === 'every-item') {
       const prop = gen.puzzle.rule.prop
       const subs = prop.kind === 'and' ? prop.of : [prop]
       const nums = subs.flatMap((p, idx) =>

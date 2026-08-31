@@ -89,3 +89,73 @@ describe('evalRule', () => {
     ).toBe(false)
   })
 })
+
+describe('evalRule on adjacent rules', () => {
+  const red: Pred = { id: 'red', attr: 'color', values: ['red'] }
+  const blue: Pred = { id: 'blue', attr: 'color', values: ['blue'] }
+
+  it('right-of holds when every match has the right neighbor', () => {
+    const rule = {
+      kind: 'adjacent' as const,
+      variant: 'right-of' as const,
+      a: vowel,
+      b: even,
+    }
+    expect(
+      evalRule(rule, [
+        { letter: 'A', number: 3 },
+        { letter: 'K', number: 2 },
+      ]),
+    ).toBe(true)
+    expect(
+      evalRule(rule, [
+        { letter: 'A', number: 3 },
+        { letter: 'K', number: 3 },
+      ]),
+    ).toBe(false)
+  })
+
+  it('right-of fails for a match in the last position', () => {
+    const rule = {
+      kind: 'adjacent' as const,
+      variant: 'right-of' as const,
+      a: vowel,
+      b: even,
+    }
+    expect(
+      evalRule(rule, [
+        { letter: 'K', number: 2 },
+        { letter: 'A', number: 2 },
+      ]),
+    ).toBe(false)
+  })
+
+  it('never-adjacent is symmetric', () => {
+    const rule = {
+      kind: 'adjacent' as const,
+      variant: 'never-adjacent' as const,
+      a: red,
+      b: blue,
+    }
+    expect(
+      evalRule(rule, [{ color: 'red' }, { color: 'green' }, { color: 'blue' }]),
+    ).toBe(true)
+    expect(evalRule(rule, [{ color: 'red' }, { color: 'blue' }])).toBe(false)
+    expect(evalRule(rule, [{ color: 'blue' }, { color: 'red' }])).toBe(false)
+  })
+
+  it('never-adjacent with equal predicates bans pairs', () => {
+    const rule = {
+      kind: 'adjacent' as const,
+      variant: 'never-adjacent' as const,
+      a: red,
+      b: red,
+    }
+    expect(
+      evalRule(rule, [{ color: 'red' }, { color: 'blue' }, { color: 'red' }]),
+    ).toBe(true)
+    expect(
+      evalRule(rule, [{ color: 'blue' }, { color: 'red' }, { color: 'red' }]),
+    ).toBe(false)
+  })
+})

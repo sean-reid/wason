@@ -20,7 +20,7 @@ export interface GeneratedPuzzle {
   meta: {
     kind: PuzzleKind
     difficulty: Difficulty
-    form: RuleForm
+    form: RuleForm | RelationalForm
     a: Pred
     b: Pred
     ruleHolds: boolean
@@ -28,7 +28,8 @@ export interface GeneratedPuzzle {
   }
 }
 
-export type PuzzleKind = 'standard' | 'vacuous' | 'broken' | 'multi' | 'audit'
+export type PuzzleKind =
+  'standard' | 'vacuous' | 'broken' | 'multi' | 'audit' | 'relational'
 
 export const ATTRIBUTES: readonly AttributeDef[] = [
   { id: 'letter', domain: ['A', 'E', 'I', 'U', 'B', 'K', 'R', 'T'] },
@@ -499,6 +500,91 @@ function tryGenerateAudit(rng: () => number): GeneratedPuzzle | undefined {
       a: r1.a,
       b: r1.b,
       rules: [r1, r2],
+      ruleHolds: evalRule(
+        puzzle.rule,
+        items.map((it) => it.attrs),
+      ),
+    },
+  }
+}
+
+export type RelationalForm = 'right-of' | 'never-adjacent'
+
+// A relational day: the rule constrains neighboring cards, so no card can be
+// judged alone and the solver works over whole worlds.
+export function generateRelational(seed: number): GeneratedPuzzle {
+  const rng = mulberry32(seed)
+  for (let attempt = 0; attempt < 800; attempt++) {
+    const candidate = tryGenerateRelational(rng)
+    if (candidate) return candidate
+  }
+  throw new Error(`no relational puzzle for seed ${seed}`)
+}
+
+function tryGenerateRelational(rng: () => number): GeneratedPuzzle | undefined {
+  const variant: RelationalForm = rng() < 0.5 ? 'right-of' : 'never-adjacent'
+  let a: Pred
+  let b: Pred
+  let attributes: AttributeDef[]
+  if (variant === 'right-of') {
+    a = pick(rng, PREDS)
+    b = pick(
+      rng,
+      PREDS.filter((p) => p.attr !== a.attr),
+    )
+    attributes = ATTRIBUTES.filter((x) => x.id === a.attr || x.id === b.attr)
+  } else {
+    a = pick(rng, PREDS)
+    b = pick(
+      rng,
+      PREDS.filter((p) => p.attr === a.attr),
+    )
+    const carrier = pick(
+      rng,
+      ATTRIBUTES.filter((x) => x.id !== a.attr),
+    )
+    attributes = [ATTRIBUTES.find((x) => x.id === a.attr)!, carrier]
+  }
+
+  const n = 5
+  const items: Item[] = []
+  const usedFaces = new Set<string>()
+  for (let i = 0; i < n; i++) {
+    const shownAttr = i < 2 ? attributes[i % 2]! : pick(rng, attributes)
+    const hiddenAttr = attributes.find((x) => x.id !== shownAttr.id)!
+    const shownValue = pick(rng, shownAttr.domain)
+    const face = `${shownAttr.id} ${String(shownValue)}`
+    if (usedFaces.has(face)) return undefined
+    usedFaces.add(face)
+    items.push({
+      attrs: {
+        [shownAttr.id]: shownValue,
+        [hiddenAttr.id]: pick(rng, hiddenAttr.domain),
+      },
+      shown: [shownAttr.id],
+    })
+  }
+
+  const puzzle: Puzzle = {
+    attributes,
+    items,
+    rule: { kind: 'adjacent', variant, a, b },
+  }
+  const solution = solve(puzzle)
+  if (solution.status !== 'test' || !solution.unique) return undefined
+  const answer = solution.reveals.map((r) => r.item)
+  if (answer.length < 2 || answer.length > 4) return undefined
+  if (answer.length >= n) return undefined
+
+  return {
+    puzzle,
+    answer,
+    meta: {
+      kind: 'relational',
+      difficulty: 4,
+      form: variant,
+      a,
+      b,
       ruleHolds: evalRule(
         puzzle.rule,
         items.map((it) => it.attrs),
