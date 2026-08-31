@@ -1,10 +1,12 @@
 import { dailyPuzzle, isValidDate, puzzleNumber, todayLocal } from './daily'
+import { evalProp } from './engine/rule'
 import { solve } from './engine/solve'
 import type { Item } from './engine/types'
 import {
   BROKEN_FACE_EXPLANATION,
   INERT_EXPLANATION,
   IRRELEVANT_EXPLANATION,
+  auditWitnessExplanation,
   faceText,
   multiWitnessExplanation,
   ruleSentence,
@@ -24,6 +26,7 @@ const date = dateParam && isValidDate(dateParam) ? dateParam : todayLocal()
 const gen = dailyPuzzle(date)
 const solution = solve(gen.puzzle)
 const facesMode = gen.meta.kind === 'multi'
+const auditMode = gen.meta.kind === 'audit'
 const required = new Set<string>(
   facesMode
     ? solution.reveals.flatMap((r) => r.attrs.map((a) => `${r.item}:${a}`))
@@ -86,20 +89,33 @@ function render(): void {
   header.append(meta)
   app.append(header)
 
-  const rule = el(
-    'p',
-    'rule',
-    ruleSentence(gen.meta.form, gen.meta.a.id, gen.meta.b.id),
-  )
-  rule.dataset.testid = 'rule'
-  app.append(rule)
+  if (auditMode) {
+    const wrap = el('div', 'rulewrap')
+    wrap.dataset.testid = 'rule'
+    gen.meta.rules!.forEach((r, idx) => {
+      wrap.append(
+        el('p', 'rule', `${idx + 1}. ${ruleSentence(r.form, r.a.id, r.b.id)}`),
+      )
+    })
+    app.append(wrap)
+  } else {
+    const rule = el(
+      'p',
+      'rule',
+      ruleSentence(gen.meta.form, gen.meta.a.id, gen.meta.b.id),
+    )
+    rule.dataset.testid = 'rule'
+    app.append(rule)
+  }
   app.append(
     el(
       'p',
       'hint',
       facesMode
         ? 'Each card hides two faces. Flip exactly the faces that could prove this false.'
-        : 'Flip exactly the cards that could prove this false. No more, no fewer.',
+        : auditMode
+          ? 'Both rules are in force. Flip exactly the cards that could prove either one false.'
+          : 'Flip exactly the cards that could prove this false. No more, no fewer.',
     ),
   )
 
@@ -318,6 +334,14 @@ function renderDone(result: DayResult): void {
         report.minimalReveals![0]!,
         report.witness!,
       )
+    } else if (auditMode) {
+      const prop = gen.puzzle.rule.prop
+      const subs = prop.kind === 'and' ? prop.of : [prop]
+      const nums = subs.flatMap((p, idx) =>
+        evalProp(p, report.witness!) ? [] : [idx + 1],
+      )
+      const hidden = hiddenAttrsOf(item)[0]!
+      text = auditWitnessExplanation(hidden, report.witness![hidden]!, nums)
     } else {
       const hidden = hiddenAttrsOf(item)[0]!
       text = witnessExplanation(hidden, report.witness![hidden]!)
