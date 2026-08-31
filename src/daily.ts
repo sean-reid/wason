@@ -1,4 +1,5 @@
 import {
+  generateAudit,
   generateBroken,
   generateConnective,
   generateMultiAttr,
@@ -50,13 +51,14 @@ export function difficultyFor(date: string): Difficulty {
 }
 
 // Roughly one non-Monday in eight is a trap day; other Saturdays are
-// multi-attribute days.
+// multi-attribute days and other Sundays are two-rule audits.
 export function dayKind(date: string): PuzzleKind {
   const weekday = new Date(utc(date)).getUTCDay()
   if (weekday === 1) return 'standard'
   const h = hashSeed(`wason-trap-${date}`)
   if (h % 8 === 0) return (h >> 3) % 2 === 0 ? 'vacuous' : 'broken'
   if (weekday === 6) return 'multi'
+  if (weekday === 0) return 'audit'
   return 'standard'
 }
 
@@ -66,5 +68,6 @@ export function dailyPuzzle(date: string): GeneratedPuzzle {
   if (kind === 'vacuous') return generateVacuous(seed, difficultyFor(date))
   if (kind === 'broken') return generateBroken(seed)
   if (kind === 'multi') return generateMultiAttr(seed)
+  if (kind === 'audit') return generateAudit(seed)
   return generateConnective(seed, difficultyFor(date))
 }

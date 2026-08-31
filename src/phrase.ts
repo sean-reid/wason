@@ -69,3 +69,19 @@ export function multiWitnessExplanation(
   const [x, y] = attrIds as [string, string]
   return `Required: both the ${x} and ${y} faces (${v(x)} with ${v(y)} would break the rule).`
 }
+
+export function auditWitnessExplanation(
+  attrId: string,
+  value: AttrValue,
+  ruleNums: readonly number[],
+): string {
+  const face =
+    attrId === 'color'
+      ? `a ${String(value)} back`
+      : `${String(value)} on the back`
+  const which =
+    ruleNums.length > 1
+      ? `rules ${ruleNums.join(' and ')}`
+      : `rule ${ruleNums[0]}`
+  return `Required: ${face} would break ${which}.`
+}

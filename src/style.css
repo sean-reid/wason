@@ -308,3 +308,15 @@ footer a {
   align-items: center;
   font-size: 1.25rem;
 }
+
+.rulewrap {
+  margin-top: 2rem;
+}
+
+.rulewrap .rule {
+  margin: 0;
+}
+
+.rulewrap .rule + .rule {
+  margin-top: 0.5rem;
+}
