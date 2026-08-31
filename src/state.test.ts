@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { loadState, saveResult, streak } from './state'
+import {
+  loadState,
+  practiceStats,
+  recordPractice,
+  saveResult,
+  streak,
+} from './state'
 
 function fakeStorage(initial?: string) {
   const map = new Map<string, string>()
@@ -12,14 +18,23 @@ function fakeStorage(initial?: string) {
 
 describe('loadState', () => {
   it('returns a fresh state when empty', () => {
-    expect(loadState(fakeStorage())).toEqual({ version: 1, results: {} })
+    expect(loadState(fakeStorage())).toEqual({
+      version: 1,
+      results: {},
+      practice: {},
+    })
   })
 
   it('returns a fresh state on corrupted data', () => {
-    expect(loadState(fakeStorage('{nope'))).toEqual({ version: 1, results: {} })
+    expect(loadState(fakeStorage('{nope'))).toEqual({
+      version: 1,
+      results: {},
+      practice: {},
+    })
     expect(loadState(fakeStorage('{"version":9}'))).toEqual({
       version: 1,
       results: {},
+      practice: {},
     })
   })
 
@@ -65,5 +80,26 @@ describe('streak', () => {
   it('crosses month boundaries', () => {
     const results = { '2026-08-31': exact, '2026-09-01': exact }
     expect(streak(results, '2026-09-01')).toBe(2)
+  })
+})
+
+describe('practice stats', () => {
+  it('records plays and exact solves per kind', () => {
+    const storage = fakeStorage()
+    recordPractice(storage, 'standard', true)
+    recordPractice(storage, 'standard', false)
+    recordPractice(storage, 'multi', true)
+    const state = loadState(storage)
+    expect(practiceStats(state, 'standard')).toEqual({ played: 2, exact: 1 })
+    expect(practiceStats(state, 'multi')).toEqual({ played: 1, exact: 1 })
+    expect(practiceStats(state, 'audit')).toEqual({ played: 0, exact: 0 })
+  })
+
+  it('tolerates stored data without a practice map', () => {
+    const storage = fakeStorage(JSON.stringify({ version: 1, results: {} }))
+    expect(practiceStats(loadState(storage), 'standard')).toEqual({
+      played: 0,
+      exact: 0,
+    })
   })
 })
