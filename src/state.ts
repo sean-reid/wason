@@ -1,7 +1,9 @@
 export type Claim = 'none' | 'broken'
 
+// A pick is a card index ("2"), or card:face on multi-attribute days
+// ("2:number").
 export interface DayResult {
-  picked: readonly number[]
+  picked: readonly string[]
   exact: boolean
   claim?: Claim
 }

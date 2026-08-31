@@ -56,3 +56,16 @@ export const BROKEN_FACE_EXPLANATION =
   'Breaks the rule face-up. No flip needed.'
 
 export const IRRELEVANT_EXPLANATION = 'Irrelevant: the rule was already broken.'
+
+export function multiWitnessExplanation(
+  attrIds: readonly string[],
+  witness: Readonly<Record<string, AttrValue>>,
+): string {
+  const v = (id: string) => String(witness[id])
+  if (attrIds.length === 1) {
+    const id = attrIds[0]!
+    return `Required: the ${id} face (${v(id)} there would break the rule).`
+  }
+  const [x, y] = attrIds as [string, string]
+  return `Required: both the ${x} and ${y} faces (${v(x)} with ${v(y)} would break the rule).`
+}
