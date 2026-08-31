@@ -2,6 +2,7 @@ import {
   generateAudit,
   generateBroken,
   generateConnective,
+  generateIdent,
   generateMultiAttr,
   generateRelational,
   generateVacuous,
@@ -52,7 +53,8 @@ export function difficultyFor(date: string): Difficulty {
 }
 
 // Roughly one non-Monday in eight is a trap day; other Saturdays are
-// multi-attribute days, Fridays are relational, Sundays are two-rule audits.
+// multi-attribute days, Wednesdays are identification, Fridays are
+// relational, Sundays are two-rule audits.
 export function dayKind(date: string): PuzzleKind {
   const weekday = new Date(utc(date)).getUTCDay()
   if (weekday === 1) return 'standard'
@@ -61,6 +63,7 @@ export function dayKind(date: string): PuzzleKind {
   if (weekday === 6) return 'multi'
   if (weekday === 0) return 'audit'
   if (weekday === 5) return 'relational'
+  if (weekday === 3) return 'ident'
   return 'standard'
 }
 
@@ -72,5 +75,6 @@ export function dailyPuzzle(date: string): GeneratedPuzzle {
   if (kind === 'multi') return generateMultiAttr(seed)
   if (kind === 'audit') return generateAudit(seed)
   if (kind === 'relational') return generateRelational(seed)
+  if (kind === 'ident') return generateIdent(seed)
   return generateConnective(seed, difficultyFor(date))
 }

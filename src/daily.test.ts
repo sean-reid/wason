@@ -79,6 +79,7 @@ describe('dayKind', () => {
       multi: 0,
       audit: 0,
       relational: 0,
+      ident: 0,
     }
     for (let offset = 0; offset < 400; offset++) {
       const t = new Date(Date.UTC(2026, 7, 31 + offset))
@@ -141,6 +142,22 @@ describe('relational fridays', () => {
         expect(['relational', 'vacuous', 'broken']).toContain(kind)
       else expect(kind).not.toBe('relational')
       if (kind === 'relational') count++
+    }
+    expect(count).toBeGreaterThan(40)
+  })
+})
+
+describe('identification wednesdays', () => {
+  it('makes non-trap Wednesdays identification days', () => {
+    let count = 0
+    for (let offset = 0; offset < 400; offset++) {
+      const t = new Date(Date.UTC(2026, 7, 31 + offset))
+      const date = t.toISOString().slice(0, 10)
+      const kind = dayKind(date)
+      if (t.getUTCDay() === 3)
+        expect(['ident', 'vacuous', 'broken']).toContain(kind)
+      else expect(kind).not.toBe('ident')
+      if (kind === 'ident') count++
     }
     expect(count).toBeGreaterThan(40)
   })

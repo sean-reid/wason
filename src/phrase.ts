@@ -100,3 +100,8 @@ export const RELATIONAL_REQUIRED =
   'Required: the rule cannot be settled without this face.'
 
 export const RELATIONAL_SAFE = 'Safe: this face cannot change the outcome.'
+
+export const IDENT_REQUIRED =
+  'Required: identification is not guaranteed without this face.'
+
+export const IDENT_SAFE = 'Safe: this face cannot help tell the rules apart.'
