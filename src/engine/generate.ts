@@ -25,11 +25,12 @@ export interface GeneratedPuzzle {
     b: Pred
     ruleHolds: boolean
     rules?: readonly RuleSpec[]
+    inForce?: number
   }
 }
 
 export type PuzzleKind =
-  'standard' | 'vacuous' | 'broken' | 'multi' | 'audit' | 'relational'
+  'standard' | 'vacuous' | 'broken' | 'multi' | 'audit' | 'relational' | 'ident'
 
 export const ATTRIBUTES: readonly AttributeDef[] = [
   { id: 'letter', domain: ['A', 'E', 'I', 'U', 'B', 'K', 'R', 'T'] },
@@ -591,4 +592,167 @@ function tryGenerateRelational(rng: () => number): GeneratedPuzzle | undefined {
       ),
     },
   }
+}
+
+const IDENT_FORMS: readonly RuleForm[] = [
+  'if-then',
+  'if-then-not',
+  'or',
+  'unless',
+  'iff',
+]
+
+// An identification day: three candidate rules are shown and exactly one is
+// in force. The answer is the unique minimal reveal set guaranteed to tell
+// them apart no matter what the reveals show.
+export function generateIdent(seed: number): GeneratedPuzzle {
+  const rng = mulberry32(seed)
+  for (let attempt = 0; attempt < 3000; attempt++) {
+    const candidate = tryGenerateIdent(rng)
+    if (candidate) return candidate
+  }
+  throw new Error(`no identification puzzle for seed ${seed}`)
+}
+
+function tryGenerateIdent(rng: () => number): GeneratedPuzzle | undefined {
+  const attrX = pick(rng, ATTRIBUTES)
+  const attrY = pick(
+    rng,
+    ATTRIBUTES.filter((z) => z.id !== attrX.id),
+  )
+  const xPreds = PREDS.filter((p) => p.attr === attrX.id)
+  const yPreds = PREDS.filter((p) => p.attr === attrY.id)
+  const specs: RuleSpec[] = []
+  const seenAst = new Set<string>()
+  for (let k = 0; k < 3; k++) {
+    const spec: RuleSpec = {
+      form: pick(rng, IDENT_FORMS),
+      a: pick(rng, xPreds),
+      b: pick(rng, yPreds),
+    }
+    const key = JSON.stringify(buildProp(spec.form, spec.a, spec.b))
+    if (seenAst.has(key)) return undefined
+    seenAst.add(key)
+    specs.push(spec)
+  }
+  const props = specs.map((s) => buildProp(s.form, s.a, s.b))
+
+  const attributes = [attrX, attrY]
+  const n = 5
+  const items: Item[] = []
+  const usedFaces = new Set<string>()
+  for (let i = 0; i < n; i++) {
+    const shownAttr = i < 2 ? attributes[i % 2]! : pick(rng, attributes)
+    const hiddenAttr = attributes.find((x) => x.id !== shownAttr.id)!
+    const shownValue = pick(rng, shownAttr.domain)
+    const face = `${shownAttr.id} ${String(shownValue)}`
+    if (usedFaces.has(face)) return undefined
+    usedFaces.add(face)
+    items.push({
+      attrs: {
+        [shownAttr.id]: shownValue,
+        [hiddenAttr.id]: pick(rng, hiddenAttr.domain),
+      },
+      shown: [shownAttr.id],
+    })
+  }
+
+  const satisfied = props.map((p) => items.every((it) => evalProp(p, it.attrs)))
+  if (satisfied.filter(Boolean).length !== 1) return undefined
+  const inForce = satisfied.indexOf(true)
+
+  const per = items.map((it) => completions(it, attributes))
+  const sizes = per.map((c) => c.length)
+  const strides = sizes.map((_, i) =>
+    sizes.slice(0, i).reduce((x, y) => x * y, 1),
+  )
+  const count = sizes.reduce((x, y) => x * y, 1)
+  const truthPer = props.map((p) =>
+    per.map((comps) => comps.map((c) => evalProp(p, c))),
+  )
+  const labels = new Int8Array(count)
+  const seenLabel = [false, false, false]
+  for (let w = 0; w < count; w++) {
+    let label = -1
+    let dup = false
+    for (let k = 0; k < 3; k++) {
+      let sat = true
+      for (let i = 0; i < items.length; i++) {
+        if (!truthPer[k]![i]![Math.floor(w / strides[i]!) % sizes[i]!]) {
+          sat = false
+          break
+        }
+      }
+      if (sat) {
+        if (label >= 0) dup = true
+        label = k
+      }
+    }
+    labels[w] = label < 0 || dup ? -1 : label
+    if (labels[w]! >= 0) seenLabel[labels[w]!] = true
+  }
+  if (!seenLabel.every(Boolean)) return undefined
+
+  const discriminates = (mask: number): boolean => {
+    const members: number[] = []
+    for (let i = 0; i < items.length; i++) if (mask & (1 << i)) members.push(i)
+    const subStrides: number[] = []
+    let acc = 1
+    for (const i of members) {
+      subStrides.push(acc)
+      acc *= sizes[i]!
+    }
+    const seen = new Map<number, number>()
+    for (let w = 0; w < count; w++) {
+      const label = labels[w]!
+      if (label < 0) continue
+      let key = 0
+      for (let k = 0; k < members.length; k++) {
+        const i = members[k]!
+        key += (Math.floor(w / strides[i]!) % sizes[i]!) * subStrides[k]!
+      }
+      const prev = seen.get(key)
+      if (prev === undefined) seen.set(key, label)
+      else if (prev !== label) return false
+    }
+    return true
+  }
+
+  const masks = Array.from({ length: 1 << n }, (_, m) => m).sort(
+    (x, y) => bitCount(x) - bitCount(y),
+  )
+  const minimals: number[] = []
+  for (const mask of masks) {
+    if (minimals.some((m) => (m & mask) === m)) continue
+    if (discriminates(mask)) minimals.push(mask)
+  }
+  if (minimals.length !== 1) return undefined
+  const answer: number[] = []
+  for (let i = 0; i < n; i++) if (minimals[0]! & (1 << i)) answer.push(i)
+  if (answer.length < 2 || answer.length > 4) return undefined
+
+  return {
+    puzzle: {
+      attributes,
+      items,
+      rule: { kind: 'every-item', prop: props[inForce]! },
+    },
+    answer,
+    meta: {
+      kind: 'ident',
+      difficulty: 3,
+      form: specs[inForce]!.form,
+      a: specs[inForce]!.a,
+      b: specs[inForce]!.b,
+      rules: specs,
+      inForce,
+      ruleHolds: true,
+    },
+  }
+}
+
+function bitCount(x: number): number {
+  let c = 0
+  for (let v = x; v > 0; v >>= 1) c += v & 1
+  return c
 }

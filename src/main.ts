@@ -5,6 +5,8 @@ import type { Item } from './engine/types'
 import {
   BROKEN_FACE_EXPLANATION,
   INERT_EXPLANATION,
+  IDENT_REQUIRED,
+  IDENT_SAFE,
   IRRELEVANT_EXPLANATION,
   RELATIONAL_REQUIRED,
   RELATIONAL_SAFE,
@@ -29,11 +31,14 @@ const gen = dailyPuzzle(date)
 const solution = solve(gen.puzzle)
 const facesMode = gen.meta.kind === 'multi'
 const relationalMode = gen.meta.kind === 'relational'
+const identMode = gen.meta.kind === 'ident'
 const auditMode = gen.meta.kind === 'audit'
 const required = new Set<string>(
   facesMode
     ? solution.reveals.flatMap((r) => r.attrs.map((a) => `${r.item}:${a}`))
-    : solution.reveals.map((r) => String(r.item)),
+    : identMode
+      ? gen.answer.map(String)
+      : solution.reveals.map((r) => String(r.item)),
 )
 const number = puzzleNumber(date)
 const broken = solution.status === 'already-false'
@@ -92,7 +97,7 @@ function render(): void {
   header.append(meta)
   app.append(header)
 
-  if (auditMode) {
+  if (auditMode || identMode) {
     const wrap = el('div', 'rulewrap')
     wrap.dataset.testid = 'rule'
     gen.meta.rules!.forEach((r, idx) => {
@@ -120,7 +125,9 @@ function render(): void {
           ? 'Both rules are in force. Flip exactly the cards that could prove either one false.'
           : relationalMode
             ? 'Order matters: the rule constrains neighbors. Flip exactly the cards that could prove it false.'
-            : 'Flip exactly the cards that could prove this false. No more, no fewer.',
+            : identMode
+              ? 'Exactly one of these rules is in force. Flip exactly the cards guaranteed to reveal which.'
+              : 'Flip exactly the cards that could prove this false. No more, no fewer.',
     ),
   )
 
@@ -303,7 +310,12 @@ function renderDone(result: DayResult): void {
       ),
     )
   }
-  if (!broken) {
+  if (identMode) {
+    verdict.append(
+      el('p', 'sub', `Rule ${gen.meta.inForce! + 1} was in force.`),
+    )
+  }
+  if (!broken && !identMode) {
     verdict.append(
       el(
         'p',
@@ -332,6 +344,8 @@ function renderDone(result: DayResult): void {
         report.kind === 'always-false'
           ? BROKEN_FACE_EXPLANATION
           : IRRELEVANT_EXPLANATION
+    } else if (identMode) {
+      text = required.has(String(i)) ? IDENT_REQUIRED : IDENT_SAFE
     } else if (relationalMode) {
       text =
         report.kind === 'contingent' ? RELATIONAL_REQUIRED : RELATIONAL_SAFE
