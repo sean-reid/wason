@@ -335,3 +335,35 @@ footer a {
   border-color: var(--accent, var(--fg));
   color: var(--accent, var(--fg));
 }
+
+.nav {
+  display: flex;
+  gap: 1.25rem;
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.nav a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.nav a[aria-current='true'] {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 1.25rem;
+}
+
+.controls + .controls {
+  margin-top: 0.5rem;
+}
+
+.controls .chip {
+  padding-inline: 0.9rem;
+}
