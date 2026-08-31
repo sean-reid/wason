@@ -113,18 +113,13 @@ const PRACTICE_KINDS = [
 type PracticeKind = (typeof PRACTICE_KINDS)[number]['id']
 
 let practiceKind: PracticeKind = 'standard'
-let practiceDifficulty: Difficulty = 2
 const practiceCounters = new Map<string, number>()
 
-function practicePuzzle(
-  kind: PracticeKind,
-  difficulty: Difficulty,
-  count: number,
-): GeneratedPuzzle {
-  const seed = hashSeed(`practice-${kind}-${difficulty}-${count}`)
+function practicePuzzle(kind: PracticeKind, count: number): GeneratedPuzzle {
+  const seed = hashSeed(`practice-${kind}-${count}`)
   switch (kind) {
     case 'standard':
-      return generateConnective(seed, difficulty)
+      return generateConnective(seed, ((count % 5) + 1) as Difficulty)
     case 'multi':
       return generateMultiAttr(seed)
     case 'relational':
@@ -159,24 +154,7 @@ function practiceView(): void {
     kindRow.append(chip)
   }
   view.append(kindRow)
-
-  if (practiceKind === 'standard') {
-    const diffRow = el('div', 'controls')
-    for (const d of [1, 2, 3, 4, 5] as const) {
-      const chip = el('button', 'chip', String(d))
-      chip.type = 'button'
-      chip.setAttribute(
-        'aria-pressed',
-        practiceDifficulty === d ? 'true' : 'false',
-      )
-      chip.addEventListener('click', () => {
-        practiceDifficulty = d
-        practiceView()
-      })
-      diffRow.append(chip)
-    }
-    view.append(diffRow)
-  }
+  view.append(el('p', 'hint', 'Endless. Classic ramps up as you go.'))
 
   const host = el('div')
   view.append(host)
@@ -184,9 +162,9 @@ function practiceView(): void {
 }
 
 function startPractice(host: HTMLElement, metaText: () => string): void {
-  const key = `${practiceKind}-${practiceDifficulty}`
+  const key = practiceKind
   const count = practiceCounters.get(key) ?? 0
-  const gen = practicePuzzle(practiceKind, practiceDifficulty, count)
+  const gen = practicePuzzle(practiceKind, count)
   renderGame(host, {
     gen,
     skin: ABSTRACT,

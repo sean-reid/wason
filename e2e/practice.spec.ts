@@ -8,7 +8,7 @@ test('practice: solve a classic puzzle, see stats, continue', async ({
   await page.goto('/wason/#practice')
   await expect(page.getByTestId('meta')).toContainText('0 played')
 
-  const gen = generateConnective(hashSeed('practice-standard-2-0'), 2)
+  const gen = generateConnective(hashSeed('practice-standard-0'), 1)
   for (const i of gen.answer) {
     await page.locator(`.card[data-index="${i}"]`).click()
   }
