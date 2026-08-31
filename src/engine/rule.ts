@@ -1,4 +1,4 @@
-import type { Attrs, ItemProp, Rule } from './types'
+import type { Attrs, ItemProp, Pred, Rule } from './types'
 
 export function evalProp(prop: ItemProp, attrs: Attrs): boolean {
   switch (prop.kind) {
@@ -21,6 +21,31 @@ export function evalProp(prop: ItemProp, attrs: Attrs): boolean {
   }
 }
 
+function evalPred(pred: Pred, attrs: Attrs): boolean {
+  const v = attrs[pred.attr]
+  if (v === undefined) throw new Error(`missing attribute ${pred.attr}`)
+  return pred.values.includes(v)
+}
+
 export function evalRule(rule: Rule, allAttrs: readonly Attrs[]): boolean {
-  return allAttrs.every((attrs) => evalProp(rule.prop, attrs))
+  switch (rule.kind) {
+    case 'every-item':
+      return allAttrs.every((attrs) => evalProp(rule.prop, attrs))
+    case 'adjacent': {
+      const { variant, a, b } = rule
+      if (variant === 'right-of') {
+        return allAttrs.every(
+          (attrs, i) =>
+            !evalPred(a, attrs) ||
+            (i + 1 < allAttrs.length && evalPred(b, allAttrs[i + 1]!)),
+        )
+      }
+      return allAttrs.every(
+        (attrs, i) =>
+          i + 1 >= allAttrs.length ||
+          (!(evalPred(a, attrs) && evalPred(b, allAttrs[i + 1]!)) &&
+            !(evalPred(b, attrs) && evalPred(a, allAttrs[i + 1]!))),
+      )
+    }
+  }
 }

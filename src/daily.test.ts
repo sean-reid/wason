@@ -72,7 +72,14 @@ describe('dayKind', () => {
   })
 
   it('lands traps of both kinds at a modest rate', () => {
-    const kinds = { standard: 0, vacuous: 0, broken: 0, multi: 0, audit: 0 }
+    const kinds = {
+      standard: 0,
+      vacuous: 0,
+      broken: 0,
+      multi: 0,
+      audit: 0,
+      relational: 0,
+    }
     for (let offset = 0; offset < 400; offset++) {
       const t = new Date(Date.UTC(2026, 7, 31 + offset))
       kinds[dayKind(t.toISOString().slice(0, 10))]++
@@ -120,5 +127,21 @@ describe('audit sundays', () => {
       if (kind === 'audit') audits++
     }
     expect(audits).toBeGreaterThan(40)
+  })
+})
+
+describe('relational fridays', () => {
+  it('makes non-trap Fridays relational days', () => {
+    let count = 0
+    for (let offset = 0; offset < 400; offset++) {
+      const t = new Date(Date.UTC(2026, 7, 31 + offset))
+      const date = t.toISOString().slice(0, 10)
+      const kind = dayKind(date)
+      if (t.getUTCDay() === 5)
+        expect(['relational', 'vacuous', 'broken']).toContain(kind)
+      else expect(kind).not.toBe('relational')
+      if (kind === 'relational') count++
+    }
+    expect(count).toBeGreaterThan(40)
   })
 })

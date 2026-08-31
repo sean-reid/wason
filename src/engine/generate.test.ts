@@ -9,6 +9,7 @@ import {
   generateAudit,
   generateConnective,
   generateMultiAttr,
+  generateRelational,
   generateVacuous,
   type Difficulty,
 } from './generate'
@@ -153,8 +154,12 @@ describe('generateAudit', () => {
       const g = generateAudit(hashSeed(`audit-${s}`))
       expect(g.meta.kind).toBe('audit')
       expect(g.meta.rules).toHaveLength(2)
-      const [p1, p2] = (g.puzzle.rule.prop as { kind: 'and'; of: ItemProp[] })
-        .of
+      const [p1, p2] = (
+        g.puzzle.rule as {
+          kind: 'every-item'
+          prop: { kind: 'and'; of: ItemProp[] }
+        }
+      ).prop.of
       expect(JSON.stringify(p1)).not.toBe(JSON.stringify(p2))
       const solution = solve(g.puzzle)
       expect(solution.status).toBe('test')
@@ -175,6 +180,29 @@ describe('generateAudit', () => {
     const seed = hashSeed('audit-fixed')
     expect(JSON.stringify(generateAudit(seed))).toBe(
       JSON.stringify(generateAudit(seed)),
+    )
+  })
+})
+
+describe('generateRelational', () => {
+  it('produces unique answers on neighbor-coupled rules', () => {
+    for (let s = 0; s < 10; s++) {
+      const g = generateRelational(hashSeed(`rel-${s}`))
+      expect(g.meta.kind).toBe('relational')
+      expect(g.puzzle.rule.kind).toBe('adjacent')
+      const solution = solve(g.puzzle)
+      expect(solution.status).toBe('test')
+      expect(solution.unique).toBe(true)
+      expect(g.answer.length).toBeGreaterThanOrEqual(2)
+      expect(g.answer.length).toBeLessThanOrEqual(4)
+      expect(g.answer.length).toBeLessThan(g.puzzle.items.length)
+    }
+  }, 60000)
+
+  it('is deterministic', () => {
+    const seed = hashSeed('rel-fixed')
+    expect(JSON.stringify(generateRelational(seed))).toBe(
+      JSON.stringify(generateRelational(seed)),
     )
   })
 })

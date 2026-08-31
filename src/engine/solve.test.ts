@@ -3,7 +3,12 @@ import { hashSeed } from '../seed'
 import { generateConnective, type Difficulty } from './generate'
 import { evalProp } from './rule'
 import { completions, solve } from './solve'
-import type { AttributeDef, ItemProp, Pred, Puzzle } from './types'
+import type { AttributeDef, ItemProp, Pred, Puzzle, Rule } from './types'
+
+function propOf(rule: Rule): ItemProp {
+  if (rule.kind !== 'every-item') throw new Error('itemwise rules only')
+  return rule.prop
+}
 
 const letter: AttributeDef = {
   id: 'letter',
@@ -47,7 +52,7 @@ describe('solve', () => {
     expect(s.perItem[1]!.kind).toBe('always-true')
     expect(s.perItem[2]!.kind).toBe('always-true')
     expect(s.perItem[0]!.witness).toMatchObject({ letter: 'E' })
-    expect(evalProp(puzzle.rule.prop, s.perItem[0]!.witness!)).toBe(false)
+    expect(evalProp(propOf(puzzle.rule), s.perItem[0]!.witness!)).toBe(false)
   })
 
   it('reports a rule already false from a visible face', () => {
@@ -86,7 +91,7 @@ interface WorldTable {
 function buildWorlds(puzzle: Puzzle): WorldTable {
   const per = puzzle.items.map((it) => completions(it, puzzle.attributes))
   const truthPer = per.map((comps) =>
-    comps.map((c) => evalProp(puzzle.rule.prop, c)),
+    comps.map((c) => evalProp(propOf(puzzle.rule), c)),
   )
   const sizes = per.map((c) => c.length)
   const strides = sizes.map((_, i) =>
@@ -160,4 +165,58 @@ describe('solver agrees with a naive subset search', () => {
     },
     30000,
   )
+})
+
+describe('solve on relational rules', () => {
+  const color: AttributeDef = {
+    id: 'color',
+    domain: ['red', 'blue', 'green', 'yellow'],
+  }
+  const red: Pred = { id: 'red', attr: 'color', values: ['red'] }
+
+  it('requires exactly the coupled pair for a right-of rule', () => {
+    const puzzle: Puzzle = {
+      attributes: [letter, number],
+      items: [
+        card('letter', 'E', 4),
+        card('number', 'A', 4),
+        card('letter', 'K', 7),
+      ],
+      rule: { kind: 'adjacent', variant: 'right-of', a: vowel, b: even },
+    }
+    const s = solve(puzzle)
+    expect(s.status).toBe('test')
+    expect(s.unique).toBe(true)
+    expect(s.reveals.map((r) => r.item)).toEqual([1, 2])
+    expect(s.perItem[0]!.kind).toBe('always-true')
+  })
+
+  it('reports an adjacency already broken by visible faces', () => {
+    const puzzle: Puzzle = {
+      attributes: [color, letter],
+      items: [
+        { attrs: { color: 'red', letter: 'A' }, shown: ['color'] },
+        { attrs: { color: 'red', letter: 'K' }, shown: ['color'] },
+        { attrs: { color: 'blue', letter: 'E' }, shown: ['letter'] },
+      ],
+      rule: { kind: 'adjacent', variant: 'never-adjacent', a: red, b: red },
+    }
+    const s = solve(puzzle)
+    expect(s.status).toBe('already-false')
+  })
+
+  it('returns no reveals when no card can match the antecedent', () => {
+    const puzzle: Puzzle = {
+      attributes: [letter, number],
+      items: [
+        card('letter', 'K', 1),
+        card('letter', 'B', 2),
+        card('letter', 'T', 3),
+      ],
+      rule: { kind: 'adjacent', variant: 'right-of', a: vowel, b: even },
+    }
+    const s = solve(puzzle)
+    expect(s.status).toBe('test')
+    expect(s.reveals).toEqual([])
+  })
 })

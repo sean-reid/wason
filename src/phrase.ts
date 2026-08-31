@@ -1,4 +1,4 @@
-import type { RuleForm } from './engine/generate'
+import type { RelationalForm, RuleForm } from './engine/generate'
 import type { AttrValue } from './engine/types'
 
 const PRED_PHRASES: Record<string, string> = {
@@ -17,10 +17,20 @@ export function predPhrase(predId: string): string {
   return phrase
 }
 
-export function ruleSentence(form: RuleForm, aId: string, bId: string): string {
+export function ruleSentence(
+  form: RuleForm | RelationalForm,
+  aId: string,
+  bId: string,
+): string {
   const a = predPhrase(aId)
   const b = predPhrase(bId)
   switch (form) {
+    case 'right-of':
+      return `Every card with ${a} has a card with ${b} immediately to its right.`
+    case 'never-adjacent':
+      return aId === bId
+        ? `Two cards with ${a} are never side by side.`
+        : `A card with ${a} is never next to a card with ${b}.`
     case 'if-then':
       return `If a card has ${a} on one side, it has ${b} on the other.`
     case 'only-if':
@@ -85,3 +95,8 @@ export function auditWitnessExplanation(
       : `rule ${ruleNums[0]}`
   return `Required: ${face} would break ${which}.`
 }
+
+export const RELATIONAL_REQUIRED =
+  'Required: the rule cannot be settled without this face.'
+
+export const RELATIONAL_SAFE = 'Safe: this face cannot change the outcome.'
