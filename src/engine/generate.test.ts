@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { evalProp } from './rule'
-import type { ItemProp } from './types'
+import type { Attrs, ItemProp, Pred } from './types'
 import { hashSeed } from '../seed'
 import {
   FORMS,
@@ -8,10 +8,13 @@ import {
   generateBroken,
   generateAudit,
   generateConnective,
+  generateIdent,
   generateMultiAttr,
   generateRelational,
   generateVacuous,
   type Difficulty,
+  type GeneratedPuzzle,
+  type RuleSpec,
 } from './generate'
 import { completions, solve } from './solve'
 
@@ -203,6 +206,99 @@ describe('generateRelational', () => {
     const seed = hashSeed('rel-fixed')
     expect(JSON.stringify(generateRelational(seed))).toBe(
       JSON.stringify(generateRelational(seed)),
+    )
+  })
+})
+
+describe('generateIdent', () => {
+  function admissibleLabel(
+    g: GeneratedPuzzle,
+    world: readonly Attrs[],
+  ): number {
+    const props = g.meta.rules!.map((r) => buildTestProp(r))
+    const sat = props.map((p) => world.every((attrs) => evalProp(p, attrs)))
+    return sat.filter(Boolean).length === 1 ? sat.indexOf(true) : -1
+  }
+
+  function buildTestProp(r: RuleSpec): ItemProp {
+    const P = (pred: Pred): ItemProp => ({ kind: 'pred', pred })
+    switch (r.form) {
+      case 'if-then':
+      case 'only-if':
+        return { kind: 'implies', ante: P(r.a), cons: P(r.b) }
+      case 'if-then-not':
+        return {
+          kind: 'implies',
+          ante: P(r.a),
+          cons: { kind: 'not', of: P(r.b) },
+        }
+      case 'if-not-then':
+        return {
+          kind: 'implies',
+          ante: { kind: 'not', of: P(r.a) },
+          cons: P(r.b),
+        }
+      case 'or':
+      case 'unless':
+        return { kind: 'or', of: [P(r.a), P(r.b)] }
+      case 'iff':
+        return { kind: 'iff', a: P(r.a), b: P(r.b) }
+      default:
+        throw new Error(`unexpected form ${r.form}`)
+    }
+  }
+
+  function worlds(g: GeneratedPuzzle): Attrs[][] {
+    const per = g.puzzle.items.map((it) => completions(it, g.puzzle.attributes))
+    let out: Attrs[][] = [[]]
+    for (const comps of per) {
+      out = out.flatMap((prefix) => comps.map((c) => [...prefix, c]))
+    }
+    return out
+  }
+
+  function naiveDiscriminates(
+    g: GeneratedPuzzle,
+    subset: readonly number[],
+  ): boolean {
+    const seen = new Map<string, number>()
+    for (const world of worlds(g)) {
+      const label = admissibleLabel(g, world)
+      if (label < 0) continue
+      const key = subset.map((i) => JSON.stringify(world[i])).join('|')
+      const prev = seen.get(key)
+      if (prev === undefined) seen.set(key, label)
+      else if (prev !== label) return false
+    }
+    return true
+  }
+
+  it('produces three live candidates with a unique discriminating set', () => {
+    for (let s = 0; s < 5; s++) {
+      const g = generateIdent(hashSeed(`ident-${s}`))
+      expect(g.meta.kind).toBe('ident')
+      expect(g.meta.rules).toHaveLength(3)
+      expect(g.meta.inForce).toBeGreaterThanOrEqual(0)
+      const world = g.puzzle.items.map((it) => it.attrs)
+      expect(admissibleLabel(g, world)).toBe(g.meta.inForce)
+      expect(g.answer.length).toBeGreaterThanOrEqual(2)
+      expect(g.answer.length).toBeLessThanOrEqual(4)
+      expect(naiveDiscriminates(g, g.answer)).toBe(true)
+      for (const drop of g.answer) {
+        expect(
+          naiveDiscriminates(
+            g,
+            g.answer.filter((i) => i !== drop),
+          ),
+        ).toBe(false)
+      }
+    }
+  }, 60000)
+
+  it('is deterministic', () => {
+    const seed = hashSeed('ident-fixed')
+    expect(JSON.stringify(generateIdent(seed))).toBe(
+      JSON.stringify(generateIdent(seed)),
     )
   })
 })
