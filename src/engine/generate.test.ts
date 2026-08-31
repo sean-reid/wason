@@ -5,6 +5,7 @@ import {
   ITEM_COUNT,
   generateBroken,
   generateConnective,
+  generateMultiAttr,
   generateVacuous,
   type Difficulty,
 } from './generate'
@@ -113,6 +114,32 @@ describe('generateBroken', () => {
     const seed = hashSeed('broke-fixed')
     expect(JSON.stringify(generateBroken(seed))).toBe(
       JSON.stringify(generateBroken(seed)),
+    )
+  })
+})
+
+describe('generateMultiAttr', () => {
+  it('needs face-level picks with both single and double reveals', () => {
+    for (let s = 0; s < 15; s++) {
+      const g = generateMultiAttr(hashSeed(`multi-${s}`))
+      expect(g.meta.kind).toBe('multi')
+      const solution = solve(g.puzzle)
+      expect(solution.status).toBe('test')
+      expect(solution.unique).toBe(true)
+      expect(solution.reveals.some((r) => r.attrs.length === 1)).toBe(true)
+      expect(solution.reveals.some((r) => r.attrs.length === 2)).toBe(true)
+      const pairs = solution.reveals.reduce((sum, r) => sum + r.attrs.length, 0)
+      expect(pairs).toBeGreaterThanOrEqual(3)
+      expect(pairs).toBeLessThanOrEqual(6)
+      for (const it of g.puzzle.items)
+        expect(Object.keys(it.attrs)).toHaveLength(3)
+    }
+  })
+
+  it('is deterministic', () => {
+    const seed = hashSeed('multi-fixed')
+    expect(JSON.stringify(generateMultiAttr(seed))).toBe(
+      JSON.stringify(generateMultiAttr(seed)),
     )
   })
 })

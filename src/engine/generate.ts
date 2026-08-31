@@ -27,7 +27,7 @@ export interface GeneratedPuzzle {
   }
 }
 
-export type PuzzleKind = 'standard' | 'vacuous' | 'broken'
+export type PuzzleKind = 'standard' | 'vacuous' | 'broken' | 'multi'
 
 export const ATTRIBUTES: readonly AttributeDef[] = [
   { id: 'letter', domain: ['A', 'E', 'I', 'U', 'B', 'K', 'R', 'T'] },
@@ -328,5 +328,76 @@ function tryGenerateBroken(rng: () => number): GeneratedPuzzle | undefined {
     puzzle,
     answer: [],
     meta: { kind: 'broken', difficulty: 3, form: 'or', a, b, ruleHolds: false },
+  }
+}
+
+const MULTI_FORMS: readonly RuleForm[] = ['if-then', 'if-then-not', 'or']
+
+// A multi-attribute day: cards carry all three attributes and hide two, so a
+// pick is a card plus a face. Some cards need one specific face, some need
+// both, and picking an uninformative face is the new way to be wrong.
+export function generateMultiAttr(seed: number): GeneratedPuzzle {
+  const rng = mulberry32(seed)
+  for (let attempt = 0; attempt < 5000; attempt++) {
+    const candidate = tryGenerateMultiAttr(rng)
+    if (candidate) return candidate
+  }
+  throw new Error(`no multi-attribute puzzle for seed ${seed}`)
+}
+
+function tryGenerateMultiAttr(rng: () => number): GeneratedPuzzle | undefined {
+  const form = pick(rng, MULTI_FORMS)
+  const a = pick(rng, PREDS)
+  const b = pick(
+    rng,
+    PREDS.filter((p) => p.attr !== a.attr),
+  )
+  const n = 4
+
+  const items: Item[] = []
+  const usedFaces = new Set<string>()
+  for (let i = 0; i < n; i++) {
+    const shownAttr = i < 3 ? ATTRIBUTES[i]! : pick(rng, ATTRIBUTES)
+    const shownValue = pick(rng, shownAttr.domain)
+    const face = `${shownAttr.id} ${String(shownValue)}`
+    if (usedFaces.has(face)) return undefined
+    usedFaces.add(face)
+    const attrs: Record<string, string | number> = {}
+    for (const attr of ATTRIBUTES) {
+      attrs[attr.id] =
+        attr.id === shownAttr.id ? shownValue : pick(rng, attr.domain)
+    }
+    items.push({ attrs, shown: [shownAttr.id] })
+  }
+
+  const puzzle: Puzzle = {
+    attributes: ATTRIBUTES,
+    items,
+    rule: { kind: 'every-item', prop: buildProp(form, a, b) },
+  }
+  const solution = solve(puzzle)
+  if (solution.status !== 'test' || !solution.unique) return undefined
+
+  const reveals = solution.reveals
+  const pairCount = reveals.reduce((sum, r) => sum + r.attrs.length, 0)
+  if (pairCount < 3 || pairCount > 6) return undefined
+  if (!reveals.some((r) => r.attrs.length === 1)) return undefined
+  if (!reveals.some((r) => r.attrs.length === 2)) return undefined
+  if (reveals.length >= n) return undefined
+
+  return {
+    puzzle,
+    answer: reveals.map((r) => r.item),
+    meta: {
+      kind: 'multi',
+      difficulty: 4,
+      form,
+      a,
+      b,
+      ruleHolds: evalRule(
+        puzzle.rule,
+        items.map((it) => it.attrs),
+      ),
+    },
   }
 }
