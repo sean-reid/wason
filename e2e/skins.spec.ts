@@ -1,15 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { dailyPuzzle } from '../src/daily'
-import { skinFor } from '../src/skins'
-
-function firstDateWithSkin(id: string): string {
-  for (let offset = 1; offset < 120; offset++) {
-    const t = new Date(Date.UTC(2026, 7, 31 + offset))
-    const date = t.toISOString().slice(0, 10)
-    if (skinFor(date, dailyPuzzle(date)).id === id) return date
-  }
-  throw new Error(`no ${id} date within range`)
-}
+import { firstDateWithSkin } from './helpers'
 
 test('bouncer days phrase the rule about patrons', async ({ page }) => {
   const date = firstDateWithSkin('bouncer')

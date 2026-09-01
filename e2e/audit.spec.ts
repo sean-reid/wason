@@ -1,20 +1,12 @@
 import { expect, test } from '@playwright/test'
-import { dailyPuzzle, dayKind } from '../src/daily'
+import { dailyPuzzle } from '../src/daily'
 import { solve } from '../src/engine/solve'
-
-function firstAuditDate(): string {
-  for (let offset = 1; offset < 60; offset++) {
-    const t = new Date(Date.UTC(2026, 7, 31 + offset))
-    const date = t.toISOString().slice(0, 10)
-    if (dayKind(date) === 'audit') return date
-  }
-  throw new Error('no audit date within range')
-}
+import { firstDateOf } from './helpers'
 
 test('audit day: shows two rules and accepts the exact set', async ({
   page,
 }) => {
-  const date = firstAuditDate()
+  const date = firstDateOf('audit')
   const solution = solve(dailyPuzzle(date).puzzle)
   await page.goto(`/wason/?date=${date}`)
   await expect(page.getByTestId('rule')).toContainText('1.')
@@ -32,7 +24,7 @@ test('audit day: shows two rules and accepts the exact set', async ({
 })
 
 test('audit day: covering only one rule is not enough', async ({ page }) => {
-  const date = firstAuditDate()
+  const date = firstDateOf('audit')
   const solution = solve(dailyPuzzle(date).puzzle)
   const first = solution.reveals[0]!.item
   await page.goto(`/wason/?date=${date}`)

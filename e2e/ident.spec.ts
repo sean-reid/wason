@@ -1,19 +1,11 @@
 import { expect, test } from '@playwright/test'
-import { dailyPuzzle, dayKind } from '../src/daily'
-
-function firstIdentDate(): string {
-  for (let offset = 1; offset < 60; offset++) {
-    const t = new Date(Date.UTC(2026, 7, 31 + offset))
-    const date = t.toISOString().slice(0, 10)
-    if (dayKind(date) === 'ident') return date
-  }
-  throw new Error('no identification date within range')
-}
+import { dailyPuzzle } from '../src/daily'
+import { firstDateOf } from './helpers'
 
 test('identification day: exact set reveals the rule in force', async ({
   page,
 }) => {
-  const date = firstIdentDate()
+  const date = firstDateOf('ident')
   const g = dailyPuzzle(date)
   await page.goto(`/wason/?date=${date}`)
   await expect(page.getByTestId('rule')).toContainText('3.')
@@ -32,7 +24,7 @@ test('identification day: exact set reveals the rule in force', async ({
 })
 
 test('identification day: an insufficient set fails', async ({ page }) => {
-  const date = firstIdentDate()
+  const date = firstDateOf('ident')
   const g = dailyPuzzle(date)
   await page.goto(`/wason/?date=${date}`)
   await page.locator(`.card[data-index="${g.answer[0]}"]`).click()

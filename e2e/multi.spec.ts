@@ -1,15 +1,7 @@
 import { expect, test } from '@playwright/test'
-import { dailyPuzzle, dayKind } from '../src/daily'
+import { dailyPuzzle } from '../src/daily'
 import { solve } from '../src/engine/solve'
-
-function firstMultiDate(): string {
-  for (let offset = 1; offset < 60; offset++) {
-    const t = new Date(Date.UTC(2026, 7, 31 + offset))
-    const date = t.toISOString().slice(0, 10)
-    if (dayKind(date) === 'multi') return date
-  }
-  throw new Error('no multi date within range')
-}
+import { firstDateOf } from './helpers'
 
 function requiredKeys(date: string): string[] {
   const solution = solve(dailyPuzzle(date).puzzle)
@@ -17,7 +9,7 @@ function requiredKeys(date: string): string[] {
 }
 
 test('multi day: the exact face set is exact', async ({ page }) => {
-  const date = firstMultiDate()
+  const date = firstDateOf('multi')
   await page.goto(`/wason/?date=${date}`)
   for (const key of requiredKeys(date)) {
     await page.locator(`.chip[data-key="${key}"]`).click()
@@ -31,7 +23,7 @@ test('multi day: the exact face set is exact', async ({ page }) => {
 })
 
 test('multi day: an extra face is wasteful', async ({ page }) => {
-  const date = firstMultiDate()
+  const date = firstDateOf('multi')
   const keys = requiredKeys(date)
   await page.goto(`/wason/?date=${date}`)
   for (const key of keys) await page.locator(`.chip[data-key="${key}"]`).click()
@@ -46,7 +38,7 @@ test('multi day: an extra face is wasteful', async ({ page }) => {
 test('multi day: chips meet touch targets and layout holds on phone', async ({
   page,
 }) => {
-  const date = firstMultiDate()
+  const date = firstDateOf('multi')
   await page.setViewportSize({ width: 375, height: 800 })
   await page.goto(`/wason/?date=${date}`)
   const box = await page.locator('.chip').first().boundingBox()
