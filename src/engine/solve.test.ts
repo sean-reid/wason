@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { hashSeed } from '../seed'
-import { generateConnective, type Difficulty } from './generate'
+import {
+  generateAudit,
+  generateConnective,
+  generateMultiAttr,
+  type Difficulty,
+} from './generate'
 import { evalProp } from './rule'
 import { completions, solve } from './solve'
 import type { AttributeDef, ItemProp, Pred, Puzzle, Rule } from './types'
@@ -205,6 +210,18 @@ describe('solve on relational rules', () => {
     expect(s.status).toBe('already-false')
   })
 
+  it('treats an antecedent match in the last position as breakable', () => {
+    // The rightmost card has no follower, so a match there falsifies the rule.
+    const puzzle: Puzzle = {
+      attributes: [letter, number],
+      items: [card('letter', 'K', 2), card('number', 'A', 4)],
+      rule: { kind: 'adjacent', variant: 'right-of', a: vowel, b: even },
+    }
+    const s = solve(puzzle)
+    expect(s.status).toBe('test')
+    expect(s.reveals).toEqual([{ item: 1, attrs: ['letter'] }])
+  })
+
   it('returns no reveals when no card can match the antecedent', () => {
     const puzzle: Puzzle = {
       attributes: [letter, number],
@@ -219,4 +236,82 @@ describe('solve on relational rules', () => {
     expect(s.status).toBe('test')
     expect(s.reveals).toEqual([])
   })
+})
+
+describe('audit answers agree with the naive subset search', () => {
+  it.each([[5], [17], [29]])(
+    'audit seed %i',
+    (seed) => {
+      const g = generateAudit(hashSeed(`audit-cross-${seed}`))
+      const world = buildWorlds(g.puzzle)
+      const answer = [...g.answer].sort((a, b) => a - b)
+      expect(naiveSufficient(world, answer)).toBe(true)
+      const n = g.puzzle.items.length
+      for (let mask = 0; mask < 1 << n; mask++) {
+        const subset: number[] = []
+        for (let i = 0; i < n; i++) if (mask & (1 << i)) subset.push(i)
+        if (subset.length > answer.length) continue
+        if (subset.join(',') === answer.join(',')) continue
+        expect(
+          naiveSufficient(world, subset),
+          `subset ${subset.join(',')}`,
+        ).toBe(false)
+      }
+    },
+    60000,
+  )
+})
+
+describe('multi-attribute answers agree with a pair-level subset search', () => {
+  type Pair = readonly [number, string]
+
+  function naivePairSufficient(
+    puzzle: Puzzle,
+    pairs: readonly Pair[],
+  ): boolean {
+    const per = puzzle.items.map((it) => completions(it, puzzle.attributes))
+    const truths = per.map((comps) =>
+      comps.map((c) => evalProp(propOf(puzzle.rule), c)),
+    )
+    const idx = puzzle.items.map(() => 0)
+    const seen = new Map<string, boolean>()
+    for (;;) {
+      let ruleTruth = true
+      for (let i = 0; i < idx.length; i++) {
+        if (!truths[i]![idx[i]!]) {
+          ruleTruth = false
+          break
+        }
+      }
+      const key = pairs.map(([i, a]) => String(per[i]![idx[i]!]![a])).join('|')
+      const prev = seen.get(key)
+      if (prev === undefined) seen.set(key, ruleTruth)
+      else if (prev !== ruleTruth) return false
+      let i = 0
+      for (; i < idx.length; i++) {
+        idx[i] = idx[i]! + 1
+        if (idx[i]! < per[i]!.length) break
+        idx[i] = 0
+      }
+      if (i === idx.length) return true
+    }
+  }
+
+  it.each([[1], [2], [3]])(
+    'multi seed %i',
+    (seed) => {
+      const g = generateMultiAttr(hashSeed(`multi-pair-${seed}`))
+      const answerPairs: Pair[] = g.solution.reveals.flatMap((r) =>
+        r.attrs.map((a) => [r.item, a] as const),
+      )
+      expect(naivePairSufficient(g.puzzle, answerPairs)).toBe(true)
+      for (let drop = 0; drop < answerPairs.length; drop++) {
+        const subset = answerPairs.filter((_, k) => k !== drop)
+        expect(naivePairSufficient(g.puzzle, subset), `dropped ${drop}`).toBe(
+          false,
+        )
+      }
+    },
+    120000,
+  )
 })
