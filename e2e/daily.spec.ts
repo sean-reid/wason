@@ -28,6 +28,7 @@ test('missing a required card fails the day', async ({ page }) => {
   await page.getByTestId('submit').click()
 
   await expect(page.getByTestId('verdict')).toContainText('Not proven.')
+  await expect(page.locator('.card.wrong')).toHaveCount(g.answer.length - 1)
   await expect(page.getByTestId('meta')).toContainText('streak 0')
 })
 

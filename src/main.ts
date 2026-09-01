@@ -1,4 +1,5 @@
 import {
+  DAY_ONE,
   dailyPuzzle,
   dateOfNumber,
   isValidDate,
@@ -20,6 +21,7 @@ import { el, renderGame } from './game'
 import { hashSeed } from './seed'
 import { ABSTRACT, skinFor, type Skin } from './skins'
 import {
+  currentStreak,
   loadState,
   markKindSeen,
   practiceStats,
@@ -40,7 +42,7 @@ function applyAccent(skin: Skin): void {
 type View = 'daily' | 'practice' | 'archive' | 'how'
 
 const NAV: readonly [View, string, string][] = [
-  ['daily', 'Daily', '#'],
+  ['daily', 'Daily', './'],
   ['practice', 'Practice', '#practice'],
   ['archive', 'Archive', '#archive'],
   ['how', 'How to play', '#how'],
@@ -62,7 +64,7 @@ function chrome(active: View, metaText: string): HTMLElement {
     nav.append(a)
   }
 
-  const view = el('div')
+  const view = el('main')
   const foot = el('footer')
   const link = el('a', undefined, 'Based on the Wason selection task.')
   link.href = 'https://en.wikipedia.org/wiki/Wason_selection_task'
@@ -82,7 +84,9 @@ const PRIMER_DESCRIPTIONS: Readonly<Record<string, [PracticeKind, string]>> = {
 function dailyView(): void {
   const params = new URLSearchParams(location.search)
   const dateParam = params.get('date')
-  const date = dateParam && isValidDate(dateParam) ? dateParam : todayLocal()
+  const requested =
+    dateParam && isValidDate(dateParam) ? dateParam : todayLocal()
+  const date = puzzleNumber(requested) < 1 ? DAY_ONE : requested
   const gen = dailyPuzzle(date)
   const skin = skinFor(date, gen)
   applyAccent(skin)
@@ -90,7 +94,7 @@ function dailyView(): void {
   const state = loadState(localStorage)
   const prior = state.results[date]
   const metaText = () =>
-    `#${number} · streak ${streak(loadState(localStorage).results, date)}`
+    `#${number} · streak ${currentStreak(loadState(localStorage).results, date)}`
   const view = chrome('daily', metaText())
 
   const primer = PRIMER_DESCRIPTIONS[gen.meta.kind]
@@ -238,15 +242,24 @@ function archiveView(): void {
     row.append(
       el('span', 'num', `#${n}`),
       el('span', undefined, date),
-      el(
-        'span',
-        r ? (r.exact ? 'st-exact' : 'st-fail') : 'st-open',
-        r ? (r.exact ? '✓' : '✗') : '·',
-      ),
+      status(r),
     )
     list.append(row)
   }
   view.append(list)
+}
+
+function status(r: DayResult | undefined): HTMLElement {
+  const span = el(
+    'span',
+    r ? (r.exact ? 'st-exact' : 'st-fail') : 'st-open',
+    r ? (r.exact ? '✓' : '✗') : '·',
+  )
+  span.setAttribute(
+    'aria-label',
+    r ? (r.exact ? 'solved' : 'missed') : 'not played',
+  )
+  return span
 }
 
 function howView(): void {
@@ -254,13 +267,15 @@ function howView(): void {
   const view = chrome('how', 'how to play')
   view.append(el('p', 'rule', 'Prove the rule, or say why you cannot.'))
   const prose = [
-    'Each day states a rule about a row of cards and their hidden backs. Select exactly the cards that could prove the rule false, no more and no fewer, then submit. One try per day.',
+    'Each day states a rule about a row of cards and their hidden backs. Select exactly what could prove the rule false, no more and no fewer, then submit. One try per day, and the day rolls over at your local midnight.',
     'The classic mistake is flipping the card the rule mentions instead of the card that could break it. "If a card has a vowel, it has an even number" is broken only by a vowel with an odd back, so the vowel and the odd number matter and the even number never does.',
     'Some days no flip helps. If nothing could break the rule, submit with no cards selected and claim it. If a visible face already breaks the rule, flag that instead.',
-    'The week ramps up: gentle Mondays, identification Wednesdays, neighbor rules Fridays, two-face cards Saturdays, double rules Sundays, and the odd trap in between.',
-    'Try one. Practice never touches your streak.',
+    'The week ramps up: gentle Mondays, identification Wednesdays, neighbor rules Fridays, two-face cards Saturdays, double rules Sundays, and the odd trap in between. On those days the picks change shape, and the hint above the cards says how.',
+    'Your streak counts consecutive days solved exactly. Try one below; examples never touch your streak.',
   ]
-  for (const t of prose) view.append(el('p', 'prose', t))
+  prose.forEach((t, i) =>
+    view.append(el('p', i === 0 ? 'prose lead' : 'prose', t)),
+  )
   const host = el('div')
   view.append(host)
   startTutorial(host, 0)
@@ -295,5 +310,39 @@ function route(): void {
   else dailyView()
 }
 
-window.addEventListener('hashchange', route)
-route()
+function renderCrash(): void {
+  app.replaceChildren()
+  const header = el('header')
+  header.append(el('h1', undefined, 'Wason'))
+  app.append(header)
+  app.append(el('p', 'rule', 'Something broke.'))
+  app.append(
+    el(
+      'p',
+      'prose lead',
+      'Saved data on this device may be damaged. Clearing it usually fixes this.',
+    ),
+  )
+  const reset = el('button', 'primary', 'Clear saved data and reload')
+  reset.type = 'button'
+  reset.addEventListener('click', () => {
+    try {
+      localStorage.removeItem('wason')
+    } catch {
+      // storage unavailable; reload anyway
+    }
+    location.reload()
+  })
+  app.append(reset)
+}
+
+function safeRoute(): void {
+  try {
+    route()
+  } catch {
+    renderCrash()
+  }
+}
+
+window.addEventListener('hashchange', safeRoute)
+safeRoute()

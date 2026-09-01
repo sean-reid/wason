@@ -1,15 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { dayKind } from '../src/daily'
-import type { PuzzleKind } from '../src/engine/generate'
-
-function firstDateOf(kind: PuzzleKind): string {
-  for (let offset = 1; offset < 400; offset++) {
-    const t = new Date(Date.UTC(2026, 7, 31 + offset))
-    const date = t.toISOString().slice(0, 10)
-    if (dayKind(date) === kind) return date
-  }
-  throw new Error(`no ${kind} date within range`)
-}
+import { firstDateOf } from './helpers'
 
 test('vacuous day: claiming nothing can break it is exact', async ({
   page,
