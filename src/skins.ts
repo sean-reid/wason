@@ -150,11 +150,9 @@ const SKIN_BY_WEEKDAY: Readonly<Record<number, Skin>> = {
 }
 
 function specsOf(gen: GeneratedPuzzle): readonly RuleSpec[] {
-  return (
-    gen.meta.rules ?? [
-      { form: gen.meta.form as RuleSpec['form'], a: gen.meta.a, b: gen.meta.b },
-    ]
-  )
+  const meta = gen.meta
+  if (meta.kind === 'audit' || meta.kind === 'ident') return meta.rules
+  return [{ form: meta.form as RuleSpec['form'], a: meta.a, b: meta.b }]
 }
 
 export function covers(skin: Skin, gen: GeneratedPuzzle): boolean {

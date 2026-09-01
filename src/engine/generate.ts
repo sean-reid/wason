@@ -1,96 +1,50 @@
 import { mulberry32 } from '../seed'
 import { evalProp, evalRule } from './rule'
-import { completions, solve } from './solve'
-import type { AttributeDef, Item, ItemProp, Pred, Puzzle } from './types'
+import { completions, solve, type Solution } from './solve'
+import type { Item, Pred, Puzzle } from './types'
+import {
+  ATTRIBUTES,
+  FORMS,
+  IMPLIES_FORMS,
+  ITEM_COUNT,
+  PREDS,
+  buildProp,
+  pick,
+  sampleItems,
+  type Difficulty,
+  type RelationalForm,
+  type RuleForm,
+  type RuleSpec,
+} from './vocab'
+import { buildWorlds, maskSettles, minimalMasks, worldDigit } from './worlds'
 
-export type RuleForm =
-  | 'if-then'
-  | 'only-if'
-  | 'if-then-not'
-  | 'if-not-then'
-  | 'or'
-  | 'unless'
-  | 'iff'
-
-export type Difficulty = 1 | 2 | 3 | 4 | 5
-
-export interface GeneratedPuzzle {
-  puzzle: Puzzle
-  answer: readonly number[]
-  meta: {
-    kind: PuzzleKind
-    difficulty: Difficulty
-    form: RuleForm | RelationalForm
-    a: Pred
-    b: Pred
-    ruleHolds: boolean
-    rules?: readonly RuleSpec[]
-    inForce?: number
-  }
-}
+export { ATTRIBUTES, FORMS, ITEM_COUNT, PREDS, buildProp } from './vocab'
+export { generateBroken, generateVacuous } from './traps'
+export type { Difficulty, RelationalForm, RuleForm, RuleSpec } from './vocab'
 
 export type PuzzleKind =
   'standard' | 'vacuous' | 'broken' | 'multi' | 'audit' | 'relational' | 'ident'
 
-export const ATTRIBUTES: readonly AttributeDef[] = [
-  { id: 'letter', domain: ['A', 'E', 'I', 'U', 'B', 'K', 'R', 'T'] },
-  { id: 'number', domain: [1, 2, 3, 4, 5, 6, 7, 8] },
-  { id: 'color', domain: ['red', 'blue', 'green', 'yellow'] },
-]
-
-export const PREDS: readonly Pred[] = [
-  { id: 'vowel', attr: 'letter', values: ['A', 'E', 'I', 'U'] },
-  { id: 'consonant', attr: 'letter', values: ['B', 'K', 'R', 'T'] },
-  { id: 'even', attr: 'number', values: [2, 4, 6, 8] },
-  { id: 'odd', attr: 'number', values: [1, 3, 5, 7] },
-  { id: 'prime', attr: 'number', values: [2, 3, 5, 7] },
-  { id: 'red', attr: 'color', values: ['red'] },
-  { id: 'blue', attr: 'color', values: ['blue'] },
-]
-
-export const FORMS: Record<Difficulty, readonly RuleForm[]> = {
-  1: ['if-then'],
-  2: ['if-then', 'if-then-not', 'only-if'],
-  3: ['or', 'unless', 'if-then-not'],
-  4: ['iff', 'or', 'if-not-then'],
-  5: ['iff', 'if-not-then', 'unless'],
+interface MetaBase {
+  difficulty: Difficulty
+  form: RuleForm | RelationalForm
+  a: Pred
+  b: Pred
+  ruleHolds: boolean
 }
 
-export const ITEM_COUNT: Record<Difficulty, number> = {
-  1: 4,
-  2: 4,
-  3: 5,
-  4: 5,
-  5: 6,
-}
+export type PuzzleMeta =
+  | (MetaBase & {
+      kind: 'standard' | 'vacuous' | 'broken' | 'multi' | 'relational'
+    })
+  | (MetaBase & { kind: 'audit'; rules: readonly RuleSpec[] })
+  | (MetaBase & { kind: 'ident'; rules: readonly RuleSpec[]; inForce: number })
 
-const IMPLIES_FORMS: readonly RuleForm[] = [
-  'if-then',
-  'only-if',
-  'if-then-not',
-  'if-not-then',
-]
-
-function buildProp(form: RuleForm, a: Pred, b: Pred): ItemProp {
-  const P = (pred: Pred): ItemProp => ({ kind: 'pred', pred })
-  switch (form) {
-    case 'if-then':
-    case 'only-if':
-      return { kind: 'implies', ante: P(a), cons: P(b) }
-    case 'if-then-not':
-      return { kind: 'implies', ante: P(a), cons: { kind: 'not', of: P(b) } }
-    case 'if-not-then':
-      return { kind: 'implies', ante: { kind: 'not', of: P(a) }, cons: P(b) }
-    case 'or':
-    case 'unless':
-      return { kind: 'or', of: [P(a), P(b)] }
-    case 'iff':
-      return { kind: 'iff', a: P(a), b: P(b) }
-  }
-}
-
-function pick<T>(rng: () => number, arr: readonly T[]): T {
-  return arr[Math.floor(rng() * arr.length)]!
+export interface GeneratedPuzzle {
+  puzzle: Puzzle
+  answer: readonly number[]
+  solution: Solution
+  meta: PuzzleMeta
 }
 
 export function generateConnective(
@@ -120,26 +74,9 @@ function tryGenerate(
   const attributes = ATTRIBUTES.filter(
     (x) => x.id === a.attr || x.id === b.attr,
   )
-  const n = ITEM_COUNT[difficulty]
-
-  const items: Item[] = []
-  const usedFaces = new Set<string>()
-  for (let i = 0; i < n; i++) {
-    // Keep both sides of the rule represented among the visible faces.
-    const shownAttr = i < 2 ? attributes[i % 2]! : pick(rng, attributes)
-    const hiddenAttr = attributes.find((x) => x.id !== shownAttr.id)!
-    const shownValue = pick(rng, shownAttr.domain)
-    const face = `${shownAttr.id} ${String(shownValue)}`
-    if (usedFaces.has(face)) return undefined
-    usedFaces.add(face)
-    items.push({
-      attrs: {
-        [shownAttr.id]: shownValue,
-        [hiddenAttr.id]: pick(rng, hiddenAttr.domain),
-      },
-      shown: [shownAttr.id],
-    })
-  }
+  const items = sampleItems(rng, attributes, ITEM_COUNT[difficulty])
+  if (!items) return undefined
+  const n = items.length
 
   const puzzle: Puzzle = {
     attributes,
@@ -168,6 +105,7 @@ function tryGenerate(
   return {
     puzzle,
     answer,
+    solution,
     meta: {
       kind: 'standard',
       difficulty,
@@ -182,165 +120,11 @@ function tryGenerate(
   }
 }
 
-const VACUOUS_FORMS: readonly RuleForm[] = ['if-then', 'only-if', 'if-then-not']
-
-// A vacuous day: the rule mentions live categories but no visible face is
-// consistent with hiding a counterexample. The exact answer is no flips.
-export function generateVacuous(
-  seed: number,
-  difficulty: Difficulty,
-): GeneratedPuzzle {
-  const rng = mulberry32(seed)
-  for (let attempt = 0; attempt < 5000; attempt++) {
-    const candidate = tryGenerateVacuous(rng, difficulty)
-    if (candidate) return candidate
-  }
-  // Large boards are rarely all-inert; a smaller board beats a blank day.
-  if (difficulty !== 3) return generateVacuous(seed, 3)
-  throw new Error(`no vacuous puzzle for seed ${seed}`)
-}
-
-function tryGenerateVacuous(
-  rng: () => number,
-  difficulty: Difficulty,
-): GeneratedPuzzle | undefined {
-  const form = pick(rng, VACUOUS_FORMS)
-  const a = pick(rng, PREDS)
-  const b = pick(
-    rng,
-    PREDS.filter((p) => p.attr !== a.attr),
-  )
-  const attributes = ATTRIBUTES.filter(
-    (x) => x.id === a.attr || x.id === b.attr,
-  )
-  const n = ITEM_COUNT[difficulty]
-
-  const items: Item[] = []
-  const usedFaces = new Set<string>()
-  for (let i = 0; i < n; i++) {
-    const shownAttr = i < 2 ? attributes[i % 2]! : pick(rng, attributes)
-    const hiddenAttr = attributes.find((x) => x.id !== shownAttr.id)!
-    const shownValue = pick(rng, shownAttr.domain)
-    const face = `${shownAttr.id} ${String(shownValue)}`
-    if (usedFaces.has(face)) return undefined
-    usedFaces.add(face)
-    items.push({
-      attrs: {
-        [shownAttr.id]: shownValue,
-        [hiddenAttr.id]: pick(rng, hiddenAttr.domain),
-      },
-      shown: [shownAttr.id],
-    })
-  }
-
-  const puzzle: Puzzle = {
-    attributes,
-    items,
-    rule: { kind: 'every-item', prop: buildProp(form, a, b) },
-  }
-  const solution = solve(puzzle)
-  if (solution.status !== 'test' || solution.reveals.length > 0)
-    return undefined
-
-  return {
-    puzzle,
-    answer: [],
-    meta: { kind: 'vacuous', difficulty, form, a, b, ruleHolds: true },
-  }
-}
-
-const BREAKABLE_PAIRS: readonly (readonly [string, string])[] = [
-  ['odd', 'prime'],
-  ['red', 'blue'],
-]
-
-// A broken day: the rule constrains one attribute, and exactly one visible
-// face already violates it. The exact answer is flagging the violation.
-export function generateBroken(seed: number): GeneratedPuzzle {
-  const rng = mulberry32(seed)
-  for (let attempt = 0; attempt < 5000; attempt++) {
-    const candidate = tryGenerateBroken(rng)
-    if (candidate) return candidate
-  }
-  throw new Error(`no broken puzzle for seed ${seed}`)
-}
-
-function tryGenerateBroken(rng: () => number): GeneratedPuzzle | undefined {
-  const [aId, bId] = pick(rng, BREAKABLE_PAIRS)
-  const a = PREDS.find((p) => p.id === aId)!
-  const b = PREDS.find((p) => p.id === bId)!
-  const ruleAttr = ATTRIBUTES.find((x) => x.id === a.attr)!
-  const carrier = pick(
-    rng,
-    ATTRIBUTES.filter((x) => x.id !== ruleAttr.id),
-  )
-  const satisfying = ruleAttr.domain.filter(
-    (v) => a.values.includes(v) || b.values.includes(v),
-  )
-  const violating = ruleAttr.domain.filter(
-    (v) => !a.values.includes(v) && !b.values.includes(v),
-  )
-  const n = 5
-  const violatorAt = Math.floor(rng() * n)
-
-  const items: Item[] = []
-  const usedFaces = new Set<string>()
-  for (let i = 0; i < n; i++) {
-    const showRule = i === violatorAt || rng() < 0.4
-    const shownAttr = showRule ? ruleAttr : carrier
-    const hiddenAttr = showRule ? carrier : ruleAttr
-    const shownValue =
-      i === violatorAt
-        ? pick(rng, violating)
-        : showRule
-          ? pick(rng, satisfying)
-          : pick(rng, carrier.domain)
-    const face = `${shownAttr.id} ${String(shownValue)}`
-    if (usedFaces.has(face)) return undefined
-    usedFaces.add(face)
-    items.push({
-      attrs: {
-        [shownAttr.id]: shownValue,
-        [hiddenAttr.id]: pick(rng, hiddenAttr.domain),
-      },
-      shown: [shownAttr.id],
-    })
-  }
-
-  const hiders = items.filter((it) => !it.shown.includes(ruleAttr.id)).length
-  if (hiders < 2) return undefined
-
-  const puzzle: Puzzle = {
-    attributes: [ruleAttr, carrier],
-    items,
-    rule: {
-      kind: 'every-item',
-      prop: {
-        kind: 'or',
-        of: [
-          { kind: 'pred', pred: a },
-          { kind: 'pred', pred: b },
-        ],
-      },
-    },
-  }
-  const solution = solve(puzzle)
-  if (solution.status !== 'already-false') return undefined
-  if (solution.perItem.filter((r) => r.kind === 'always-false').length !== 1)
-    return undefined
-
-  return {
-    puzzle,
-    answer: [],
-    meta: { kind: 'broken', difficulty: 3, form: 'or', a, b, ruleHolds: false },
-  }
-}
-
 const MULTI_FORMS: readonly RuleForm[] = ['if-then', 'if-then-not', 'or']
 
 // A multi-attribute day: cards carry all three attributes and hide two, so a
-// pick is a card plus a face. Some cards need one specific face, some need
-// both, and picking an uninformative face is the new way to be wrong.
+// pick is a card plus a hidden side. Some cards need one specific side, some
+// need both, and picking an uninformative side is the new way to be wrong.
 export function generateMultiAttr(seed: number): GeneratedPuzzle {
   const rng = mulberry32(seed)
   for (let attempt = 0; attempt < 5000; attempt++) {
@@ -393,6 +177,7 @@ function tryGenerateMultiAttr(rng: () => number): GeneratedPuzzle | undefined {
   return {
     puzzle,
     answer: reveals.map((r) => r.item),
+    solution,
     meta: {
       kind: 'multi',
       difficulty: 4,
@@ -405,12 +190,6 @@ function tryGenerateMultiAttr(rng: () => number): GeneratedPuzzle | undefined {
       ),
     },
   }
-}
-
-export interface RuleSpec {
-  form: RuleForm
-  a: Pred
-  b: Pred
 }
 
 const AUDIT_FORMS: readonly RuleForm[] = [
@@ -455,24 +234,9 @@ function tryGenerateAudit(rng: () => number): GeneratedPuzzle | undefined {
   if (JSON.stringify(p1) === JSON.stringify(p2)) return undefined
 
   const attributes = [attrX, attrY]
-  const n = 6
-  const items: Item[] = []
-  const usedFaces = new Set<string>()
-  for (let i = 0; i < n; i++) {
-    const shownAttr = i < 2 ? attributes[i % 2]! : pick(rng, attributes)
-    const hiddenAttr = attributes.find((x) => x.id !== shownAttr.id)!
-    const shownValue = pick(rng, shownAttr.domain)
-    const face = `${shownAttr.id} ${String(shownValue)}`
-    if (usedFaces.has(face)) return undefined
-    usedFaces.add(face)
-    items.push({
-      attrs: {
-        [shownAttr.id]: shownValue,
-        [hiddenAttr.id]: pick(rng, hiddenAttr.domain),
-      },
-      shown: [shownAttr.id],
-    })
-  }
+  const items = sampleItems(rng, attributes, 6)
+  if (!items) return undefined
+  const n = items.length
 
   const puzzle: Puzzle = {
     attributes,
@@ -496,6 +260,7 @@ function tryGenerateAudit(rng: () => number): GeneratedPuzzle | undefined {
   return {
     puzzle,
     answer,
+    solution,
     meta: {
       kind: 'audit',
       difficulty: 5,
@@ -510,8 +275,6 @@ function tryGenerateAudit(rng: () => number): GeneratedPuzzle | undefined {
     },
   }
 }
-
-export type RelationalForm = 'right-of' | 'never-adjacent'
 
 // A relational day: the rule constrains neighboring cards, so no card can be
 // judged alone and the solver works over whole worlds.
@@ -528,7 +291,7 @@ function tryGenerateRelational(rng: () => number): GeneratedPuzzle | undefined {
   const variant: RelationalForm = rng() < 0.5 ? 'right-of' : 'never-adjacent'
   let a: Pred
   let b: Pred
-  let attributes: AttributeDef[]
+  let attributes: typeof ATTRIBUTES
   if (variant === 'right-of') {
     a = pick(rng, PREDS)
     b = pick(
@@ -549,24 +312,9 @@ function tryGenerateRelational(rng: () => number): GeneratedPuzzle | undefined {
     attributes = [ATTRIBUTES.find((x) => x.id === a.attr)!, carrier]
   }
 
-  const n = 5
-  const items: Item[] = []
-  const usedFaces = new Set<string>()
-  for (let i = 0; i < n; i++) {
-    const shownAttr = i < 2 ? attributes[i % 2]! : pick(rng, attributes)
-    const hiddenAttr = attributes.find((x) => x.id !== shownAttr.id)!
-    const shownValue = pick(rng, shownAttr.domain)
-    const face = `${shownAttr.id} ${String(shownValue)}`
-    if (usedFaces.has(face)) return undefined
-    usedFaces.add(face)
-    items.push({
-      attrs: {
-        [shownAttr.id]: shownValue,
-        [hiddenAttr.id]: pick(rng, hiddenAttr.domain),
-      },
-      shown: [shownAttr.id],
-    })
-  }
+  const items = sampleItems(rng, attributes, 5)
+  if (!items) return undefined
+  const n = items.length
 
   const puzzle: Puzzle = {
     attributes,
@@ -582,6 +330,7 @@ function tryGenerateRelational(rng: () => number): GeneratedPuzzle | undefined {
   return {
     puzzle,
     answer,
+    solution,
     meta: {
       kind: 'relational',
       difficulty: 4,
@@ -640,47 +389,27 @@ function tryGenerateIdent(rng: () => number): GeneratedPuzzle | undefined {
   const props = specs.map((s) => buildProp(s.form, s.a, s.b))
 
   const attributes = [attrX, attrY]
-  const n = 5
-  const items: Item[] = []
-  const usedFaces = new Set<string>()
-  for (let i = 0; i < n; i++) {
-    const shownAttr = i < 2 ? attributes[i % 2]! : pick(rng, attributes)
-    const hiddenAttr = attributes.find((x) => x.id !== shownAttr.id)!
-    const shownValue = pick(rng, shownAttr.domain)
-    const face = `${shownAttr.id} ${String(shownValue)}`
-    if (usedFaces.has(face)) return undefined
-    usedFaces.add(face)
-    items.push({
-      attrs: {
-        [shownAttr.id]: shownValue,
-        [hiddenAttr.id]: pick(rng, hiddenAttr.domain),
-      },
-      shown: [shownAttr.id],
-    })
-  }
+  const items = sampleItems(rng, attributes, 5)
+  if (!items) return undefined
+  const n = items.length
 
   const satisfied = props.map((p) => items.every((it) => evalProp(p, it.attrs)))
   if (satisfied.filter(Boolean).length !== 1) return undefined
   const inForce = satisfied.indexOf(true)
 
-  const per = items.map((it) => completions(it, attributes))
-  const sizes = per.map((c) => c.length)
-  const strides = sizes.map((_, i) =>
-    sizes.slice(0, i).reduce((x, y) => x * y, 1),
-  )
-  const count = sizes.reduce((x, y) => x * y, 1)
+  const table = buildWorlds(items, attributes)
   const truthPer = props.map((p) =>
-    per.map((comps) => comps.map((c) => evalProp(p, c))),
+    table.per.map((comps) => comps.map((c) => evalProp(p, c))),
   )
-  const labels = new Int8Array(count)
+  const labels = new Int8Array(table.count)
   const seenLabel = [false, false, false]
-  for (let w = 0; w < count; w++) {
+  for (let w = 0; w < table.count; w++) {
     let label = -1
     let dup = false
     for (let k = 0; k < 3; k++) {
       let sat = true
       for (let i = 0; i < items.length; i++) {
-        if (!truthPer[k]![i]![Math.floor(w / strides[i]!) % sizes[i]!]) {
+        if (!truthPer[k]![i]![worldDigit(table, w, i)]) {
           sat = false
           break
         }
@@ -695,51 +424,23 @@ function tryGenerateIdent(rng: () => number): GeneratedPuzzle | undefined {
   }
   if (!seenLabel.every(Boolean)) return undefined
 
-  const discriminates = (mask: number): boolean => {
-    const members: number[] = []
-    for (let i = 0; i < items.length; i++) if (mask & (1 << i)) members.push(i)
-    const subStrides: number[] = []
-    let acc = 1
-    for (const i of members) {
-      subStrides.push(acc)
-      acc *= sizes[i]!
-    }
-    const seen = new Map<number, number>()
-    for (let w = 0; w < count; w++) {
-      const label = labels[w]!
-      if (label < 0) continue
-      let key = 0
-      for (let k = 0; k < members.length; k++) {
-        const i = members[k]!
-        key += (Math.floor(w / strides[i]!) % sizes[i]!) * subStrides[k]!
-      }
-      const prev = seen.get(key)
-      if (prev === undefined) seen.set(key, label)
-      else if (prev !== label) return false
-    }
-    return true
-  }
-
-  const masks = Array.from({ length: 1 << n }, (_, m) => m).sort(
-    (x, y) => bitCount(x) - bitCount(y),
+  const minimals = minimalMasks(n, (mask) =>
+    maskSettles(table, mask, (w) => labels[w]!),
   )
-  const minimals: number[] = []
-  for (const mask of masks) {
-    if (minimals.some((m) => (m & mask) === m)) continue
-    if (discriminates(mask)) minimals.push(mask)
-  }
   if (minimals.length !== 1) return undefined
   const answer: number[] = []
   for (let i = 0; i < n; i++) if (minimals[0]! & (1 << i)) answer.push(i)
   if (answer.length < 2 || answer.length > 4) return undefined
 
+  const puzzle: Puzzle = {
+    attributes,
+    items,
+    rule: { kind: 'every-item', prop: props[inForce]! },
+  }
   return {
-    puzzle: {
-      attributes,
-      items,
-      rule: { kind: 'every-item', prop: props[inForce]! },
-    },
+    puzzle,
     answer,
+    solution: solve(puzzle),
     meta: {
       kind: 'ident',
       difficulty: 3,
@@ -751,10 +452,4 @@ function tryGenerateIdent(rng: () => number): GeneratedPuzzle | undefined {
       ruleHolds: true,
     },
   }
-}
-
-function bitCount(x: number): number {
-  let c = 0
-  for (let v = x; v > 0; v >>= 1) c += v & 1
-  return c
 }

@@ -14,8 +14,9 @@ test('identification day: exact set reveals the rule in force', async ({
   }
   await page.getByTestId('submit').click()
   await expect(page.getByTestId('verdict')).toContainText('Exact.')
+  const inForce = g.meta.kind === 'ident' ? g.meta.inForce : -1
   await expect(page.getByTestId('verdict')).toContainText(
-    `Rule ${g.meta.inForce! + 1} was in force.`,
+    `Rule ${inForce + 1} was in force.`,
   )
   await page.screenshot({
     path: 'test-results/ident-solved.png',

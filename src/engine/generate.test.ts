@@ -20,6 +20,18 @@ import { completions, solve } from './solve'
 
 const DIFFICULTIES: readonly Difficulty[] = [1, 2, 3, 4, 5]
 
+function rulesOf(g: GeneratedPuzzle): readonly RuleSpec[] {
+  const meta = g.meta
+  if (meta.kind !== 'audit' && meta.kind !== 'ident')
+    throw new Error('no rules on this kind')
+  return meta.rules
+}
+
+function inForceOf(g: GeneratedPuzzle): number {
+  if (g.meta.kind !== 'ident') throw new Error('not an ident puzzle')
+  return g.meta.inForce
+}
+
 describe('generateConnective', () => {
   it('is deterministic for a given seed and difficulty', () => {
     for (const d of DIFFICULTIES) {
@@ -156,7 +168,7 @@ describe('generateAudit', () => {
     for (let s = 0; s < 15; s++) {
       const g = generateAudit(hashSeed(`audit-${s}`))
       expect(g.meta.kind).toBe('audit')
-      expect(g.meta.rules).toHaveLength(2)
+      expect(rulesOf(g)).toHaveLength(2)
       const [p1, p2] = (
         g.puzzle.rule as {
           kind: 'every-item'
@@ -215,7 +227,7 @@ describe('generateIdent', () => {
     g: GeneratedPuzzle,
     world: readonly Attrs[],
   ): number {
-    const props = g.meta.rules!.map((r) => buildTestProp(r))
+    const props = rulesOf(g).map((r) => buildTestProp(r))
     const sat = props.map((p) => world.every((attrs) => evalProp(p, attrs)))
     return sat.filter(Boolean).length === 1 ? sat.indexOf(true) : -1
   }
@@ -277,10 +289,10 @@ describe('generateIdent', () => {
     for (let s = 0; s < 5; s++) {
       const g = generateIdent(hashSeed(`ident-${s}`))
       expect(g.meta.kind).toBe('ident')
-      expect(g.meta.rules).toHaveLength(3)
-      expect(g.meta.inForce).toBeGreaterThanOrEqual(0)
+      expect(rulesOf(g)).toHaveLength(3)
+      expect(inForceOf(g)).toBeGreaterThanOrEqual(0)
       const world = g.puzzle.items.map((it) => it.attrs)
-      expect(admissibleLabel(g, world)).toBe(g.meta.inForce)
+      expect(admissibleLabel(g, world)).toBe(inForceOf(g))
       expect(g.answer.length).toBeGreaterThanOrEqual(2)
       expect(g.answer.length).toBeLessThanOrEqual(4)
       expect(naiveDiscriminates(g, g.answer)).toBe(true)
