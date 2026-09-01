@@ -57,29 +57,56 @@ function validPractice(value: unknown): Record<string, PracticeStats> {
   return out
 }
 
+// Data written by a newer schema must never be overwritten by this code.
+const foreignBlobs = new WeakSet<SaveData>()
+
+export function isForeign(state: SaveData): boolean {
+  return foreignBlobs.has(state)
+}
+
+function migrate(parsed: unknown): SaveData | undefined {
+  if (!isRecord(parsed)) return undefined
+  // Version bumps add a step here that rewrites the previous shape in place.
+  if (parsed.version !== 1) return undefined
+  return {
+    version: 1,
+    results: validResults(parsed.results),
+    practice: validPractice(parsed.practice),
+    seenKinds: Array.isArray(parsed.seenKinds)
+      ? parsed.seenKinds.map(String)
+      : [],
+  }
+}
+
 export function loadState(storage: Pick<Storage, 'getItem'>): SaveData {
+  const fresh: SaveData = {
+    version: 1,
+    results: {},
+    practice: {},
+    seenKinds: [],
+  }
   try {
     const raw = storage.getItem(KEY)
     if (raw) {
       const parsed: unknown = JSON.parse(raw)
-      if (isRecord(parsed) && parsed.version === 1) {
-        return {
-          version: 1,
-          results: validResults(parsed.results),
-          practice: validPractice(parsed.practice),
-          seenKinds: Array.isArray(parsed.seenKinds)
-            ? parsed.seenKinds.map(String)
-            : [],
-        }
+      const migrated = migrate(parsed)
+      if (migrated) return migrated
+      if (
+        isRecord(parsed) &&
+        typeof parsed.version === 'number' &&
+        parsed.version > 1
+      ) {
+        foreignBlobs.add(fresh)
       }
     }
   } catch {
     // fall through to a fresh state
   }
-  return { version: 1, results: {}, practice: {}, seenKinds: [] }
+  return fresh
 }
 
 function persist(storage: Pick<Storage, 'setItem'>, state: SaveData): void {
+  if (foreignBlobs.has(state)) return
   try {
     storage.setItem(KEY, JSON.stringify(state))
   } catch {
