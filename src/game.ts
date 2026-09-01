@@ -53,7 +53,7 @@ export function renderGame(root: HTMLElement, o: GameOptions): void {
   )
   const broken = solution.status === 'already-false'
   const vacuous = !broken && required.size === 0
-  const unit = facesMode ? 'face' : 'card'
+  const unit = facesMode ? 'side' : 'card'
   const selected = new Set<string>()
 
   function judgeExact(picked: readonly string[], claim?: Claim): boolean {
@@ -77,11 +77,14 @@ export function renderGame(root: HTMLElement, o: GameOptions): void {
 
   function faceContent(attrId: string, value: string | number): HTMLElement {
     if (skin.swatchAttrs.includes(attrId)) {
-      const dot = el('span', `swatch c-${String(value)}`)
-      dot.title = String(value)
-      dot.setAttribute('role', 'img')
-      dot.setAttribute('aria-label', String(value))
-      return dot
+      const wrap = el('span', 'swatchwrap')
+      wrap.setAttribute('role', 'img')
+      wrap.setAttribute('aria-label', String(value))
+      wrap.append(
+        el('span', `swatch c-${String(value)}`),
+        el('span', 'swatch-label', String(value)),
+      )
+      return wrap
     }
     const text = displayValue(skin, attrId, value)
     return el('span', text.length > 3 ? 'val word' : 'val', text)
@@ -119,7 +122,7 @@ export function renderGame(root: HTMLElement, o: GameOptions): void {
       'p',
       'hint',
       facesMode
-        ? 'Each card hides two faces. Flip exactly the faces that could prove this false.'
+        ? 'These cards have three sides and show one. Pick exactly the hidden sides that could prove this false.'
         : auditMode
           ? 'Both rules are in force. Flip exactly the cards that could prove either one false.'
           : relationalMode
@@ -164,9 +167,16 @@ export function renderGame(root: HTMLElement, o: GameOptions): void {
 
     const stack = el('div', 'stack')
     const chips = el('div', 'chips')
+    const frontFace = displayValue(skin, shownAttr, item.attrs[shownAttr]!)
+    chips.setAttribute('role', 'group')
+    chips.setAttribute('aria-label', `hidden sides of the ${frontFace} card`)
     for (const id of hidden) {
       const chip = el('button', 'chip', skin.attrLabels[id] ?? id)
       chip.type = 'button'
+      chip.setAttribute(
+        'aria-label',
+        `${frontFace} card, ${skin.attrLabels[id] ?? id} side`,
+      )
       const key = `${i}:${id}`
       chip.dataset.key = key
       chip.setAttribute('aria-pressed', 'false')

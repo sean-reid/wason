@@ -103,7 +103,7 @@ describe('explanations', () => {
         color: 'red',
       }),
     ).toBe(
-      'Required: both the age and wristband faces (18 with red would break the rule).',
+      'Required: both the age and wristband sides (18 with red would break the rule).',
     )
   })
 

@@ -467,3 +467,51 @@ div.card {
   border-color: var(--bad);
   color: var(--bad);
 }
+
+.swatchwrap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.swatch-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.card.revealed .front .swatch-label {
+  display: none;
+}
+
+.card.revealed .back.multi .swatch-label {
+  display: none;
+}
+
+.chip[aria-pressed='true'] {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+:root {
+  --line: #c9c9c0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --line: #3f3f3b;
+  }
+}
+
+:root {
+  --accent: var(--accent-l, var(--fg));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: var(--accent-d, var(--fg));
+  }
+}

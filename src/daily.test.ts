@@ -6,6 +6,7 @@ import {
   difficultyFor,
   isValidDate,
   puzzleNumber,
+  scheduledKind,
   dayKind,
   todayLocal,
 } from './daily'
@@ -190,5 +191,15 @@ describe('isValidDate calendar strictness', () => {
     }
     expect(isValidDate('2028-02-29')).toBe(true)
     expect(isValidDate('2027-02-29')).toBe(false)
+  })
+})
+
+describe('scheduledKind', () => {
+  it('backs the how-to weekday copy', () => {
+    expect(scheduledKind(3)).toBe('ident')
+    expect(scheduledKind(5)).toBe('relational')
+    expect(scheduledKind(6)).toBe('multi')
+    expect(scheduledKind(0)).toBe('audit')
+    for (const d of [1, 2, 4]) expect(scheduledKind(d)).toBe('standard')
   })
 })
