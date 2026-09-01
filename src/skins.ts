@@ -46,8 +46,8 @@ const BOUNCER: Skin = {
   preds: {
     vowel: { vp: 'is drinking alcohol', neg: 'is not drinking alcohol' },
     consonant: { vp: 'is drinking a soft drink', neg: 'is drinking alcohol' },
-    even: { vp: 'is 18 or older', neg: 'is under 18' },
-    odd: { vp: 'is under 18', neg: 'is 18 or older' },
+    even: { vp: 'is at least 18', neg: 'is under 18' },
+    odd: { vp: 'is under 18', neg: 'is at least 18' },
     red: { vp: 'has a red wristband', neg: 'does not have a red wristband' },
     blue: { vp: 'has a blue wristband', neg: 'does not have a blue wristband' },
   },
@@ -94,9 +94,9 @@ const LOG: Skin = {
       2: '500',
       3: '201',
       4: '404',
-      5: '301',
+      5: '204',
       6: '502',
-      7: '204',
+      7: '202',
       8: '503',
     },
     color: {

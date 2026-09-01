@@ -29,10 +29,10 @@ describe('ruleSentence', () => {
 
   it('phrases the bouncer skin', () => {
     expect(ruleSentence(bouncer, 'if-then', 'vowel', 'even')).toBe(
-      'If a patron is drinking alcohol, that patron is 18 or older.',
+      'If a patron is drinking alcohol, that patron is at least 18.',
     )
     expect(ruleSentence(bouncer, 'unless', 'red', 'even')).toBe(
-      'Every patron has a red wristband unless that patron is 18 or older.',
+      'Every patron has a red wristband unless that patron is at least 18.',
     )
   })
 
