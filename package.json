@@ -2,9 +2,11 @@
   "name": "wason",
   "version": "0.1.0",
   "private": true,
+  "description": "A daily logic puzzle.",
+  "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": "^22.13.0 || >=24.0.0"
   },
   "scripts": {
     "dev": "vite",
@@ -15,7 +17,8 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
