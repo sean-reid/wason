@@ -79,6 +79,8 @@ export function renderGame(root: HTMLElement, o: GameOptions): void {
     if (skin.swatchAttrs.includes(attrId)) {
       const dot = el('span', `swatch c-${String(value)}`)
       dot.title = String(value)
+      dot.setAttribute('role', 'img')
+      dot.setAttribute('aria-label', String(value))
       return dot
     }
     const text = displayValue(skin, attrId, value)
@@ -86,6 +88,9 @@ export function renderGame(root: HTMLElement, o: GameOptions): void {
   }
 
   root.replaceChildren()
+  const live = el('p', 'visually-hidden')
+  live.setAttribute('role', 'status')
+  root.append(live)
 
   if (auditMode || identMode) {
     const wrap = el('div', 'rulewrap')
@@ -118,14 +123,19 @@ export function renderGame(root: HTMLElement, o: GameOptions): void {
         : auditMode
           ? 'Both rules are in force. Flip exactly the cards that could prove either one false.'
           : relationalMode
-            ? 'Order matters: the rule constrains neighbors. Flip exactly the cards that could prove it false.'
+            ? gen.meta.form === 'right-of'
+              ? 'Order matters: the rule constrains neighbors, and a match in the last position has nothing to its right, which breaks the rule. Flip exactly the cards that could prove it false.'
+              : 'Order matters: the rule constrains neighbors. Flip exactly the cards that could prove it false.'
             : identMode
-              ? 'Exactly one of these rules is in force. Flip exactly the cards guaranteed to reveal which.'
+              ? 'Exactly one of these rules holds for these cards. Flip exactly the cards guaranteed to reveal which.'
               : 'Flip exactly the cards that could prove this false. No more, no fewer.',
     ),
   )
 
   const grid = el('div', 'cards')
+  if (relationalMode) {
+    grid.style.gridTemplateColumns = `repeat(${gen.puzzle.items.length}, minmax(0, 1fr))`
+  }
   gen.puzzle.items.forEach((item, i) => {
     const card = el(facesMode ? 'div' : 'button', 'card')
     if (card instanceof HTMLButtonElement) card.type = 'button'
@@ -184,7 +194,11 @@ export function renderGame(root: HTMLElement, o: GameOptions): void {
       exact: judgeExact(picked, claim),
       claim,
     }
-    o.onFinish(result)
+    try {
+      o.onFinish(result)
+    } catch {
+      // persistence must not block showing the outcome
+    }
     renderDone(result)
   }
   submit.addEventListener('click', () => {
@@ -361,6 +375,12 @@ export function renderGame(root: HTMLElement, o: GameOptions): void {
       const bar = el('div', 'share')
       bar.append(...extras)
       root.append(bar)
+    }
+    live.textContent = verdict.textContent
+    const heading = verdict.querySelector('h2')
+    if (heading) {
+      heading.tabIndex = -1
+      heading.focus()
     }
   }
 }
