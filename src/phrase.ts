@@ -61,10 +61,10 @@ export function multiWitnessExplanation(
   const val = (id: string) => displayValue(skin, id, witness[id]!)
   if (attrIds.length === 1) {
     const id = attrIds[0]!
-    return `Required: the ${label(id)} face (${val(id)} there would break the rule).`
+    return `Required: the ${label(id)} side (${val(id)} there would break the rule).`
   }
   const [x, y] = attrIds as [string, string]
-  return `Required: both the ${label(x)} and ${label(y)} faces (${val(x)} with ${val(y)} would break the rule).`
+  return `Required: both the ${label(x)} and ${label(y)} sides (${val(x)} with ${val(y)} would break the rule).`
 }
 
 export function auditWitnessExplanation(

@@ -71,16 +71,20 @@ export function difficultyFor(date: string): Difficulty {
 // Roughly one non-Monday in eight is a trap day; other Saturdays are
 // multi-attribute days, Wednesdays are identification, Fridays are
 // relational, Sundays are two-rule audits.
-export function dayKind(date: string): PuzzleKind {
-  const weekday = new Date(utc(date)).getUTCDay()
-  if (weekday === 1) return 'standard'
-  const h = hashSeed(`wason-trap-${date}`)
-  if (h % 8 === 0) return (h >> 3) % 2 === 0 ? 'vacuous' : 'broken'
+export function scheduledKind(weekday: number): PuzzleKind {
   if (weekday === 6) return 'multi'
   if (weekday === 0) return 'audit'
   if (weekday === 5) return 'relational'
   if (weekday === 3) return 'ident'
   return 'standard'
+}
+
+export function dayKind(date: string): PuzzleKind {
+  const weekday = new Date(utc(date)).getUTCDay()
+  if (weekday === 1) return 'standard'
+  const h = hashSeed(`wason-trap-${date}`)
+  if (h % 8 === 0) return (h >> 3) % 2 === 0 ? 'vacuous' : 'broken'
+  return scheduledKind(weekday)
 }
 
 export function dailyPuzzle(date: string): GeneratedPuzzle {

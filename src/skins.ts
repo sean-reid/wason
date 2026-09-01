@@ -10,6 +10,7 @@ export interface PredVoice {
 export interface Skin {
   id: 'abstract' | 'bouncer' | 'log' | 'doors'
   accent: string
+  accentDark: string
   noun: string
   pronoun: string
   attrLabels: Readonly<Record<string, string>>
@@ -21,6 +22,7 @@ export interface Skin {
 export const ABSTRACT: Skin = {
   id: 'abstract',
   accent: '',
+  accentDark: '',
   noun: 'card',
   pronoun: 'it',
   attrLabels: { letter: 'letter', number: 'number', color: 'color' },
@@ -40,6 +42,7 @@ export const ABSTRACT: Skin = {
 const BOUNCER: Skin = {
   id: 'bouncer',
   accent: '#b3540e',
+  accentDark: '#e08a4a',
   noun: 'patron',
   pronoun: 'that patron',
   attrLabels: { letter: 'drink', number: 'age', color: 'wristband' },
@@ -79,6 +82,7 @@ const BOUNCER: Skin = {
 const LOG: Skin = {
   id: 'log',
   accent: '#2e7d4f',
+  accentDark: '#5cba8a',
   noun: 'request',
   pronoun: 'it',
   attrLabels: { number: 'status', color: 'region' },
@@ -112,6 +116,7 @@ const LOG: Skin = {
 const DOORS: Skin = {
   id: 'doors',
   accent: '#2f5fe0',
+  accentDark: '#8aa8ff',
   noun: 'room',
   pronoun: 'it',
   attrLabels: { letter: 'nameplate', number: 'number', color: 'door' },

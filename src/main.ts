@@ -4,6 +4,7 @@ import {
   dateOfNumber,
   isValidDate,
   puzzleNumber,
+  scheduledKind,
   todayLocal,
 } from './daily'
 import {
@@ -16,6 +17,7 @@ import {
   generateVacuous,
   type Difficulty,
   type GeneratedPuzzle,
+  type PuzzleKind,
 } from './engine/generate'
 import { el, renderGame } from './game'
 import { hashSeed } from './seed'
@@ -34,9 +36,14 @@ import {
 const app = document.querySelector<HTMLDivElement>('#app')!
 
 function applyAccent(skin: Skin): void {
-  if (skin.accent)
-    document.documentElement.style.setProperty('--accent', skin.accent)
-  else document.documentElement.style.removeProperty('--accent')
+  const style = document.documentElement.style
+  if (skin.accent) {
+    style.setProperty('--accent-l', skin.accent)
+    style.setProperty('--accent-d', skin.accentDark)
+  } else {
+    style.removeProperty('--accent-l')
+    style.removeProperty('--accent-d')
+  }
 }
 
 type View = 'daily' | 'practice' | 'archive' | 'how'
@@ -74,8 +81,26 @@ function chrome(active: View, metaText: string): HTMLElement {
   return view
 }
 
-const PRIMER_DESCRIPTIONS: Readonly<Record<string, [PracticeKind, string]>> = {
-  multi: ['multi', 'cards hide two faces, and a pick is a card plus a face'],
+const KIND_LABEL: Readonly<Partial<Record<PuzzleKind, string>>> = {
+  multi: 'three-sided',
+  relational: 'neighbor-rule',
+  audit: 'double-rule',
+  ident: 'identification',
+}
+
+function weekSentence(): string {
+  const at = (weekday: number) =>
+    KIND_LABEL[scheduledKind(weekday)] ?? 'classic'
+  return `The week ramps up: gentle Mondays, ${at(3)} Wednesdays, ${at(5)} Fridays, ${at(6)} Saturdays, ${at(0)} Sundays, and the odd trap in between. On those days the picks change shape, and the hint above the cards says how.`
+}
+
+const PRIMER_DESCRIPTIONS: Readonly<
+  Partial<Record<PuzzleKind, [PracticeKind, string]>>
+> = {
+  multi: [
+    'multi',
+    'each card has three sides and shows one, and a pick is a single hidden side',
+  ],
   relational: ['relational', 'the rule is about neighboring cards'],
   audit: ['audit', 'two rules are in force at once'],
   ident: ['ident', 'you must work out which rule is in force'],
@@ -115,10 +140,11 @@ function dailyView(): void {
     skin,
     prior,
     onFinish: (result) => {
-      saveResult(localStorage, date, result)
+      const next = saveResult(localStorage, date, result)
       markKindSeen(localStorage, gen.meta.kind)
       const meta = app.querySelector('.meta')
-      if (meta) meta.textContent = metaText()
+      if (meta)
+        meta.textContent = `#${number} · streak ${currentStreak(next.results, date)}`
     },
     resultExtras: (result) => shareExtras(result, number, date),
   })
@@ -146,7 +172,7 @@ function shareExtras(
 
 const PRACTICE_KINDS = [
   { id: 'standard', label: 'Classic' },
-  { id: 'multi', label: 'Faces' },
+  { id: 'multi', label: 'Three-sided' },
   { id: 'relational', label: 'Neighbors' },
   { id: 'audit', label: 'Two rules' },
   { id: 'ident', label: 'Which rule' },
@@ -191,6 +217,7 @@ function practiceView(): void {
     chip.dataset.kind = k.id
     chip.setAttribute('aria-pressed', practiceKind === k.id ? 'true' : 'false')
     chip.addEventListener('click', () => {
+      if (practiceKind === k.id) return
       practiceKind = k.id
       practiceView()
     })
@@ -234,7 +261,8 @@ function archiveView(): void {
   const view = chrome('archive', 'archive')
   const results = loadState(localStorage).results
   const list = el('div', 'archive')
-  for (let n = puzzleNumber(todayLocal()); n >= 1; n--) {
+  const last = puzzleNumber(todayLocal())
+  for (let n = last; n >= Math.max(1, last - 399); n--) {
     const date = dateOfNumber(n)
     const r = results[date]
     const row = el('a', 'row')
@@ -270,7 +298,7 @@ function howView(): void {
     'Each day states a rule about a row of cards and their hidden backs. Select exactly what could prove the rule false, no more and no fewer, then submit. One try per day, and the day rolls over at your local midnight.',
     'The classic mistake is flipping the card the rule mentions instead of the card that could break it. "If a card has a vowel, it has an even number" is broken only by a vowel with an odd back, so the vowel and the odd number matter and the even number never does.',
     'Some days no flip helps. If nothing could break the rule, submit with no cards selected and claim it. If a visible face already breaks the rule, flag that instead.',
-    'The week ramps up: gentle Mondays, identification Wednesdays, neighbor rules Fridays, two-face cards Saturdays, double rules Sundays, and the odd trap in between. On those days the picks change shape, and the hint above the cards says how.',
+    weekSentence(),
     'Your streak counts consecutive days solved exactly. Try one below; examples never touch your streak.',
   ]
   prose.forEach((t, i) =>
