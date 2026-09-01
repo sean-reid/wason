@@ -6,6 +6,7 @@ export interface DayResult {
   picked: readonly string[]
   exact: boolean
   claim?: Claim
+  late?: boolean
 }
 
 export interface PracticeStats {
@@ -40,6 +41,7 @@ function validResults(value: unknown): Record<string, DayResult> {
         entry.claim === 'none' || entry.claim === 'broken'
           ? entry.claim
           : undefined,
+      late: entry.late === true ? true : undefined,
     }
   }
   return out
@@ -172,7 +174,7 @@ export function streak(
 ): number {
   let count = 0
   let day = through
-  while (results[day]?.exact && count < STREAK_CAP) {
+  while (results[day]?.exact && !results[day]?.late && count < STREAK_CAP) {
     count++
     day = previousDate(day)
   }

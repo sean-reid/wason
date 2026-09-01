@@ -188,3 +188,20 @@ describe('newer schema versions', () => {
     expect(storage.getItem('wason')).not.toBeNull()
   })
 })
+
+describe('late plays', () => {
+  const onTime = { picked: ['0'], exact: true }
+  const late = { picked: ['0'], exact: true, late: true }
+
+  it('do not extend streaks', () => {
+    const results = { '2026-09-06': late, '2026-09-07': onTime }
+    expect(streak(results, '2026-09-07')).toBe(1)
+    expect(streak({ '2026-09-07': late }, '2026-09-07')).toBe(0)
+  })
+
+  it('survive a save round trip', () => {
+    const storage = fakeStorage()
+    saveResult(storage, '2026-09-01', late)
+    expect(loadState(storage).results['2026-09-01']!.late).toBe(true)
+  })
+})

@@ -106,11 +106,16 @@ const PRIMER_DESCRIPTIONS: Readonly<
   ident: ['ident', 'you must work out which rule is in force'],
 }
 
+const FREE_PLAY = import.meta.env.VITE_FREE_PLAY === '1'
+
 function dailyView(): void {
   const params = new URLSearchParams(location.search)
   const dateParam = params.get('date')
-  const requested =
-    dateParam && isValidDate(dateParam) ? dateParam : todayLocal()
+  const today = todayLocal()
+  let requested = dateParam && isValidDate(dateParam) ? dateParam : today
+  if (!FREE_PLAY && puzzleNumber(requested) > puzzleNumber(today)) {
+    requested = today
+  }
   const date = puzzleNumber(requested) < 1 ? DAY_ONE : requested
   const gen = dailyPuzzle(date)
   const skin = skinFor(date, gen)
@@ -140,7 +145,8 @@ function dailyView(): void {
     skin,
     prior,
     onFinish: (result) => {
-      const next = saveResult(localStorage, date, result)
+      const late = !FREE_PLAY && date !== todayLocal() ? true : undefined
+      const next = saveResult(localStorage, date, { ...result, late })
       markKindSeen(localStorage, gen.meta.kind)
       const meta = app.querySelector('.meta')
       if (meta)
