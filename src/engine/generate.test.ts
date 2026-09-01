@@ -302,3 +302,12 @@ describe('generateIdent', () => {
     )
   })
 })
+
+describe('generateVacuous fallback', () => {
+  it('falls back to a smaller board instead of throwing on hard seeds', () => {
+    expect(() => generateVacuous(3302115227, 5)).not.toThrow()
+    const g = generateVacuous(3302115227, 5)
+    expect(g.meta.kind).toBe('vacuous')
+    expect(g.answer).toHaveLength(0)
+  })
+})

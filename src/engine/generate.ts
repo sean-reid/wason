@@ -195,6 +195,8 @@ export function generateVacuous(
     const candidate = tryGenerateVacuous(rng, difficulty)
     if (candidate) return candidate
   }
+  // Large boards are rarely all-inert; a smaller board beats a blank day.
+  if (difficulty !== 3) return generateVacuous(seed, 3)
   throw new Error(`no vacuous puzzle for seed ${seed}`)
 }
 
