@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  isForeign,
   currentStreak,
   loadState,
   markKindSeen,
@@ -166,5 +167,24 @@ describe('currentStreak', () => {
       '2026-09-07': { picked: [], exact: false },
     }
     expect(currentStreak(results, '2026-09-07')).toBe(0)
+  })
+})
+
+describe('newer schema versions', () => {
+  it('never overwrites data written by a newer version', () => {
+    const blob = JSON.stringify({ version: 2, someFutureShape: true })
+    const storage = fakeStorage(blob)
+    const state = loadState(storage)
+    expect(state.results).toEqual({})
+    expect(isForeign(state)).toBe(true)
+    saveResult(storage, '2026-09-07', { picked: ['0'], exact: true })
+    recordPractice(storage, 'standard', true)
+    expect(storage.getItem('wason')).toBe(blob)
+  })
+
+  it('still persists normally for current-version data', () => {
+    const storage = fakeStorage()
+    saveResult(storage, '2026-09-07', { picked: ['0'], exact: true })
+    expect(storage.getItem('wason')).not.toBeNull()
   })
 })

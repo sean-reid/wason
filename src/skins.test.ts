@@ -62,3 +62,15 @@ describe('displayValue', () => {
     }
   })
 })
+
+describe('log skin margin', () => {
+  it('keeps at least a few log days on the calendar', () => {
+    let logDays = 0
+    for (let offset = 0; offset < 400; offset++) {
+      const t = new Date(Date.UTC(2026, 7, 31 + offset))
+      const date = t.toISOString().slice(0, 10)
+      if (skinFor(date, dailyPuzzle(date)).id === 'log') logDays++
+    }
+    expect(logDays).toBeGreaterThanOrEqual(3)
+  })
+})
