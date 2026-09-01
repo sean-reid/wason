@@ -30,7 +30,13 @@ export function todayLocal(now = new Date()): string {
 
 export function isValidDate(date: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false
-  return !Number.isNaN(utc(date))
+  const [y, m, d] = date.split('-').map(Number)
+  const t = new Date(Date.UTC(y!, m! - 1, d!))
+  return (
+    t.getUTCFullYear() === y &&
+    t.getUTCMonth() === m! - 1 &&
+    t.getUTCDate() === d
+  )
 }
 
 export function puzzleNumber(date: string): number {

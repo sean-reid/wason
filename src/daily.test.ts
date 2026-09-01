@@ -176,3 +176,19 @@ describe('dateOfNumber', () => {
     }
   })
 })
+
+describe('isValidDate calendar strictness', () => {
+  it('rejects impossible dates that match the shape', () => {
+    for (const bad of [
+      '2026-02-30',
+      '2026-13-01',
+      '2026-00-10',
+      '2026-09-99',
+      '9999-99-99',
+    ]) {
+      expect(isValidDate(bad)).toBe(false)
+    }
+    expect(isValidDate('2028-02-29')).toBe(true)
+    expect(isValidDate('2027-02-29')).toBe(false)
+  })
+})

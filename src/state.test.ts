@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  currentStreak,
   loadState,
   markKindSeen,
   practiceStats,
@@ -115,5 +116,55 @@ describe('markKindSeen', () => {
     markKindSeen(storage, 'multi')
     markKindSeen(storage, 'audit')
     expect(loadState(storage).seenKinds).toEqual(['multi', 'audit'])
+  })
+})
+
+describe('loadState shape validation', () => {
+  it('drops wrong-typed fields instead of crashing later', () => {
+    const bad = JSON.stringify({
+      version: 1,
+      results: {
+        '2026-09-01': { picked: 'x', exact: true },
+        '2026-09-02': { picked: ['1'], exact: true },
+      },
+      practice: 7,
+      seenKinds: 'multi',
+    })
+    const state = loadState(fakeStorage(bad))
+    expect(state.results['2026-09-01']).toBeUndefined()
+    expect(state.results['2026-09-02']).toEqual({
+      picked: ['1'],
+      exact: true,
+      claim: undefined,
+    })
+    expect(state.practice).toEqual({})
+    expect(state.seenKinds).toEqual([])
+  })
+
+  it('treats a string results field as empty', () => {
+    const state = loadState(fakeStorage('{"version":1,"results":"x"}'))
+    expect(state.results).toEqual({})
+  })
+})
+
+describe('currentStreak', () => {
+  const exact = { picked: ['0'], exact: true }
+
+  it('extends through yesterday when today is unplayed', () => {
+    const results = { '2026-09-05': exact, '2026-09-06': exact }
+    expect(currentStreak(results, '2026-09-07')).toBe(2)
+  })
+
+  it('counts today once played', () => {
+    const results = { '2026-09-06': exact, '2026-09-07': exact }
+    expect(currentStreak(results, '2026-09-07')).toBe(2)
+  })
+
+  it('is zero after a failed today', () => {
+    const results = {
+      '2026-09-06': exact,
+      '2026-09-07': { picked: [], exact: false },
+    }
+    expect(currentStreak(results, '2026-09-07')).toBe(0)
   })
 })

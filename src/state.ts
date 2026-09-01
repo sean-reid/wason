@@ -22,17 +22,54 @@ export interface SaveData {
 
 const KEY = 'wason'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function validResults(value: unknown): Record<string, DayResult> {
+  if (!isRecord(value)) return {}
+  const out: Record<string, DayResult> = {}
+  for (const [date, entry] of Object.entries(value)) {
+    if (!isRecord(entry)) continue
+    if (!Array.isArray(entry.picked) || typeof entry.exact !== 'boolean')
+      continue
+    out[date] = {
+      picked: entry.picked.map(String),
+      exact: entry.exact,
+      claim:
+        entry.claim === 'none' || entry.claim === 'broken'
+          ? entry.claim
+          : undefined,
+    }
+  }
+  return out
+}
+
+function validPractice(value: unknown): Record<string, PracticeStats> {
+  if (!isRecord(value)) return {}
+  const out: Record<string, PracticeStats> = {}
+  for (const [kind, entry] of Object.entries(value)) {
+    if (!isRecord(entry)) continue
+    if (typeof entry.played !== 'number' || typeof entry.exact !== 'number')
+      continue
+    out[kind] = { played: entry.played, exact: entry.exact }
+  }
+  return out
+}
+
 export function loadState(storage: Pick<Storage, 'getItem'>): SaveData {
   try {
     const raw = storage.getItem(KEY)
     if (raw) {
-      const parsed = JSON.parse(raw) as Partial<SaveData>
-      if (parsed.version === 1 && parsed.results) {
+      const parsed: unknown = JSON.parse(raw)
+      if (isRecord(parsed) && parsed.version === 1) {
         return {
           version: 1,
-          results: parsed.results,
-          practice: parsed.practice ?? {},
-          seenKinds: parsed.seenKinds ?? [],
+          results: validResults(parsed.results),
+          practice: validPractice(parsed.practice),
+          seenKinds: Array.isArray(parsed.seenKinds)
+            ? parsed.seenKinds.map(String)
+            : [],
         }
       }
     }
@@ -42,6 +79,14 @@ export function loadState(storage: Pick<Storage, 'getItem'>): SaveData {
   return { version: 1, results: {}, practice: {}, seenKinds: [] }
 }
 
+function persist(storage: Pick<Storage, 'setItem'>, state: SaveData): void {
+  try {
+    storage.setItem(KEY, JSON.stringify(state))
+  } catch {
+    // storage may be full or blocked; the in-memory state still renders
+  }
+}
+
 export function markKindSeen(
   storage: Pick<Storage, 'getItem' | 'setItem'>,
   kind: string,
@@ -49,7 +94,7 @@ export function markKindSeen(
   const state = loadState(storage)
   if (!state.seenKinds.includes(kind)) {
     state.seenKinds.push(kind)
-    storage.setItem(KEY, JSON.stringify(state))
+    persist(storage, state)
   }
   return state
 }
@@ -61,7 +106,7 @@ export function saveResult(
 ): SaveData {
   const state = loadState(storage)
   state.results[date] = result
-  storage.setItem(KEY, JSON.stringify(state))
+  persist(storage, state)
   return state
 }
 
@@ -76,7 +121,7 @@ export function recordPractice(
     played: current.played + 1,
     exact: current.exact + (exact ? 1 : 0),
   }
-  storage.setItem(KEY, JSON.stringify(state))
+  persist(storage, state)
   return state
 }
 
@@ -92,15 +137,28 @@ function previousDate(date: string): string {
   return `${t.getUTCFullYear()}-${mm}-${dd}`
 }
 
+const STREAK_CAP = 40000
+
 export function streak(
   results: Record<string, DayResult>,
   through: string,
 ): number {
   let count = 0
   let day = through
-  while (results[day]?.exact) {
+  while (results[day]?.exact && count < STREAK_CAP) {
     count++
     day = previousDate(day)
   }
   return count
+}
+
+// The header streak: an unplayed today extends yesterday's run rather than
+// reading zero.
+export function currentStreak(
+  results: Record<string, DayResult>,
+  today: string,
+): number {
+  return results[today]
+    ? streak(results, today)
+    : streak(results, previousDate(today))
 }
