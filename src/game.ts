@@ -1,6 +1,5 @@
-import type { GeneratedPuzzle } from './engine/generate'
+import { buildProp, type GeneratedPuzzle } from './engine/generate'
 import { evalProp } from './engine/rule'
-import { solve } from './engine/solve'
 import type { Item } from './engine/types'
 import {
   BROKEN_FACE_EXPLANATION,
@@ -9,6 +8,7 @@ import {
   IDENT_SAFE,
   IRRELEVANT_EXPLANATION,
   RELATIONAL_REQUIRED,
+  RELATIONAL_REQUIRED_LAST,
   RELATIONAL_SAFE,
   auditWitnessExplanation,
   multiWitnessExplanation,
@@ -39,7 +39,7 @@ export interface GameOptions {
 
 export function renderGame(root: HTMLElement, o: GameOptions): void {
   const { gen, skin } = o
-  const solution = solve(gen.puzzle)
+  const solution = gen.solution
   const facesMode = gen.meta.kind === 'multi'
   const relationalMode = gen.meta.kind === 'relational'
   const identMode = gen.meta.kind === 'ident'
@@ -92,10 +92,10 @@ export function renderGame(root: HTMLElement, o: GameOptions): void {
   live.setAttribute('role', 'status')
   root.append(live)
 
-  if (auditMode || identMode) {
+  if (gen.meta.kind === 'audit' || gen.meta.kind === 'ident') {
     const wrap = el('div', 'rulewrap')
     wrap.dataset.testid = 'rule'
-    gen.meta.rules!.forEach((r, idx) => {
+    gen.meta.rules.forEach((r, idx) => {
       wrap.append(
         el(
           'p',
@@ -304,10 +304,24 @@ export function renderGame(root: HTMLElement, o: GameOptions): void {
         ),
       )
     }
-    if (identMode) {
-      verdict.append(
-        el('p', 'sub', `Rule ${gen.meta.inForce! + 1} was in force.`),
-      )
+    if (gen.meta.kind === 'ident') {
+      const ident = gen.meta
+      verdict.append(el('p', 'sub', `Rule ${ident.inForce + 1} was in force.`))
+      ident.rules.forEach((r, k) => {
+        if (k === ident.inForce) return
+        const prop = buildProp(r.form, r.a, r.b)
+        const failing = gen.puzzle.items.find((it) => !evalProp(prop, it.attrs))
+        if (failing) {
+          const face = displayValue(
+            skin,
+            failing.shown[0]!,
+            failing.attrs[failing.shown[0]!]!,
+          )
+          verdict.append(
+            el('p', 'sub', `Rule ${k + 1} fails at the ${face} card.`),
+          )
+        }
+      })
     }
     if (!broken && !identMode) {
       verdict.append(
@@ -339,7 +353,11 @@ export function renderGame(root: HTMLElement, o: GameOptions): void {
         text = required.has(String(i)) ? IDENT_REQUIRED : IDENT_SAFE
       } else if (relationalMode) {
         text =
-          report.kind === 'contingent' ? RELATIONAL_REQUIRED : RELATIONAL_SAFE
+          report.kind === 'contingent'
+            ? gen.meta.form === 'right-of' && i === gen.puzzle.items.length - 1
+              ? RELATIONAL_REQUIRED_LAST
+              : RELATIONAL_REQUIRED
+            : RELATIONAL_SAFE
       } else if (report.kind !== 'contingent') {
         text = INERT_EXPLANATION
       } else if (facesMode) {

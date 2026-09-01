@@ -83,6 +83,9 @@ export function auditWitnessExplanation(
 export const RELATIONAL_REQUIRED =
   'Required: the rule cannot be settled without this face.'
 
+export const RELATIONAL_REQUIRED_LAST =
+  'Required: a match here would sit last, with nothing to its right.'
+
 export const RELATIONAL_SAFE = 'Safe: this face cannot change the outcome.'
 
 export const IDENT_REQUIRED =
