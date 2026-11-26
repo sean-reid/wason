@@ -167,7 +167,7 @@ function shareExtras(
   const copied = el('span', 'count', '')
   shareBtn.addEventListener('click', () => {
     const s = streak(loadState(localStorage).results, date)
-    const text = `Wason #${number} ${result.exact ? '✓' : '✗'} · streak ${s}\nsean-reid.github.io/wason`
+    const text = `Wason #${number} ${result.exact ? '✓' : '✗'} · streak ${s}\nseanre.id/wason`
     navigator.clipboard
       .writeText(text)
       .then(() => (copied.textContent = 'copied'))

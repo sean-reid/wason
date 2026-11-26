@@ -60,6 +60,7 @@ test.describe('share', () => {
     const text = await page.evaluate(() => navigator.clipboard.readText())
     expect(text).toContain('Wason #8 ✓')
     expect(text).toContain('streak 1')
+    expect(text).toContain('seanre.id/wason')
     expect(text).not.toMatch(/card|flip/i)
   })
 })
