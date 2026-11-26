@@ -2,7 +2,7 @@
 
 A daily logic puzzle based on the [Wason selection task](https://en.wikipedia.org/wiki/Wason_selection_task). Everyone on the same calendar date gets the same puzzle, generated in the browser from the date. No server, no answer key: the puzzle is derived, not stored. There is also endless practice per mechanic and a replayable archive of past days.
 
-Play at https://sean-reid.github.io/wason/
+Play at https://seanre.id/wason/
 
 ## Development
 
