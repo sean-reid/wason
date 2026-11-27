@@ -33,7 +33,7 @@ test('practice: mechanic picker switches modes', async ({ page }) => {
 
 test('nav switches between daily and practice', async ({ page }) => {
   await page.goto('/wason/')
-  await page.getByRole('link', { name: 'Practice' }).click()
+  await page.getByRole('link', { name: 'Practice', exact: true }).click()
   await expect(page.getByTestId('meta')).toContainText('played')
   await page.getByRole('link', { name: 'Daily' }).click()
   await expect(page.getByTestId('meta')).toContainText('streak')
