@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/sean-reid/wason/compare/wason-v0.2.0...wason-v0.2.1) (2026-11-27)
+
+
+### Bug Fixes
+
+* **deps:** update lockfile to clear high severity audit findings ([#46](https://github.com/sean-reid/wason/issues/46)) ([04c5717](https://github.com/sean-reid/wason/commit/04c5717fcf77a7472ff992520dcff245718580d0))
+* use seanre.id/wason in the share text ([#44](https://github.com/sean-reid/wason/issues/44)) ([767b087](https://github.com/sean-reid/wason/commit/767b087fbaabcabd8d660b4aaf4b27dd5a2a41b4))
+
 ## [0.2.0](https://github.com/sean-reid/wason/compare/wason-v0.1.0...wason-v0.2.0) (2026-09-01)
 
 
